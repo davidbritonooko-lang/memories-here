@@ -3,6 +3,7 @@ import { Inter, Cormorant_Garamond, Space_Grotesk } from 'next/font/google';
 import './globals.css';
 import { ThemeProvider } from '@/features/settings/ThemeProvider';
 import { ToastProvider } from '@/components/ui/toast';
+import { WorldIdentityProvider } from '@/features/identity';
 
 const inter = Inter({
   variable: '--font-inter',
@@ -58,7 +59,9 @@ export default function RootLayout({
     >
       <body className="min-h-full flex flex-col font-ui">
         <ThemeProvider>
-          <ToastProvider>{children}</ToastProvider>
+          <ToastProvider>
+            <WorldIdentityProvider>{children}</WorldIdentityProvider>
+          </ToastProvider>
         </ThemeProvider>
       </body>
     </html>
