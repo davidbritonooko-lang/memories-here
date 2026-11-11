@@ -4,8 +4,6 @@ on:
   push:
     branches:
       - main
-      - "engineering/**"
-      - "chore/**"
   pull_request:
     branches:
       - main
@@ -15,14 +13,14 @@ permissions:
   contents: read
 
 concurrency:
-  group: validate-${{ github.workflow }}-${{ github.ref }}
+  group: validate-${{ github.workflow }}-${{ github.event.pull_request.head.ref || github.ref }}
   cancel-in-progress: true
 
 jobs:
   validate:
-    name: Type check, lint, tests, and production build
+    name: Type check, lint, tests, dependency audit, and production build
     runs-on: ubuntu-latest
-    timeout-minutes: 25
+    timeout-minutes: 30
     env:
       NEXT_TELEMETRY_DISABLED: "1"
       NEXT_PUBLIC_SUPABASE_URL: https://example.supabase.co
@@ -32,16 +30,24 @@ jobs:
       SUPABASE_JWT_SECRET: ci-placeholder-jwt-secret
     steps:
       - name: Check out source
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
 
       - name: Set up Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v5
         with:
           node-version: 22
           cache: npm
 
       - name: Install locked dependencies
         run: npm ci
+
+      - name: Report dependency advisories
+        run: |
+          npm audit --json > npm-audit.json || true
+          node -e "const a=require('./npm-audit.json'); for (const [name, v] of Object.entries(a.vulnerabilities || {})) console.log(JSON.stringify({name, severity:v.severity, direct:v.isDirect, range:v.range, fixAvailable:v.fixAvailable}));"
+
+      - name: Audit production dependencies
+        run: npm audit --omit=dev --audit-level=high
 
       - name: Type check
         run: npm run type-check

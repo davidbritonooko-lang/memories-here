@@ -30,8 +30,8 @@ export function OfflineProvider({ children }: { children: React.ReactNode }) {
       quotaMB: Number((state.quotaBytes / (1024 * 1024)).toFixed(0)),
       clearCache: () => engine.clearCache(),
       cacheMediaAsset: (asset: OfflineMediaAsset) => engine.cacheMediaAsset(asset),
-      isMediaCached: (asset) => engine.isMediaCached(asset),
-      getCachedMediaUsage: (worldId) => engine.getCachedMediaUsage(worldId),
+      isMediaCached: (asset: Pick<OfflineMediaAsset, 'worldId' | 'bucket' | 'storagePath'>) => engine.isMediaCached(asset),
+      getCachedMediaUsage: (worldId: string) => engine.getCachedMediaUsage(worldId),
       refreshEstimate: async () => {
         await engine.estimateStorage();
       },
