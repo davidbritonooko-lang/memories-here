@@ -112,7 +112,7 @@ export default function SoundtrackPage() {
     }
 
     if (successCount > 0) {
-      showToast(`Added ${successCount} new track(s) to her Soundtrack!`, 'success');
+      showToast(`Added ${successCount} new track(s) to your Soundtrack.`, 'success');
       loadLibrary();
     } else {
       showToast('Upload could not be completed.', 'error');
@@ -166,7 +166,7 @@ export default function SoundtrackPage() {
             </h1>
           </div>
           <p className="mt-1 text-sm text-secondary-text">
-            Atmospheric music that lives inside her private world.
+            Atmospheric music for your private archive.
           </p>
         </div>
 
@@ -235,13 +235,13 @@ export default function SoundtrackPage() {
         {isLoading ? (
           <div className="flex flex-col items-center justify-center p-12 text-center">
             <Spinner size="lg" />
-            <p className="mt-3 text-xs text-muted-text">Gathering her soundtrack...</p>
+            <p className="mt-3 text-xs text-muted-text">Loading your soundtrack...</p>
           </div>
         ) : tracks.length === 0 ? (
           <EmptyState
             icon={<Music className="w-6 h-6" />}
             title="No soundtrack tracks yet"
-            description="Upload gentle atmospheric music to accompany her moments and memories."
+            description="Upload music to accompany your moments and memories."
             action={
               <Button size="sm" onClick={() => setShowUploadModal(true)}>
                 Upload First Track

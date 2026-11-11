@@ -160,7 +160,7 @@ export default function MomentsPage() {
       {isLoading ? (
         <div className="flex flex-col items-center justify-center p-12 text-center">
           <Spinner size="lg" />
-          <p className="mt-3 text-xs text-muted-text">Gathering her moments...</p>
+          <p className="mt-3 text-xs text-muted-text">Loading your moments...</p>
         </div>
       ) : filteredMoments.length === 0 ? (
         moments.length === 0 ? (
