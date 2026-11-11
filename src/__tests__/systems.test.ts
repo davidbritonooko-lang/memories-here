@@ -87,16 +87,16 @@ describe('Phase 17 to 21 Acceptance Tests', () => {
   // ---------------------------------------------------------------------------
   describe('Phase 21: Home Ambient Experience (Spec Section 1)', () => {
     it('getAmbientGreeting produces personalized greetings with title and subtitle', () => {
-      const greeting = getAmbientGreeting('Peshie');
+      const greeting = getAmbientGreeting('Taylor');
       expect(typeof greeting.title).toBe('string');
-      expect(greeting.title).toContain('Peshie');
+      expect(greeting.title).toContain('Taylor');
       expect(typeof greeting.subtitle).toBe('string');
       expect(greeting.subtitle.length).toBeGreaterThan(10);
     });
 
     it('getAmbientGreeting falls back to default name when omitted', () => {
       const greeting = getAmbientGreeting();
-      expect(greeting.title).toContain('Peshie');
+      expect(greeting.title).toContain('there');
     });
   });
 });
