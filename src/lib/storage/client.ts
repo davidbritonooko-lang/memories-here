@@ -193,28 +193,59 @@ export async function getSignedUrls(
   storagePaths: string[],
   expiresInSeconds = 3600,
 ): Promise<{ urls: (string | null)[]; error: StorageError | null }> {
-  const supabase = getSupabaseBrowserClient();
+  const resolveCachedUrls = async (): Promise<(string | null)[]> =>
+    Promise.all(
+      storagePaths.map((storagePath) =>
+        getCachedMediaUrl(
+          storagePath.split('/')[0],
+          bucket as OfflineMediaBucket,
+          storagePath
+        )
+      )
+    );
 
-  const { data, error } = await supabase.storage
-    .from(bucket)
-    .createSignedUrls(storagePaths, expiresInSeconds);
+  try {
+    const supabase = getSupabaseBrowserClient();
+    const { data, error } = await supabase.storage
+      .from(bucket)
+      .createSignedUrls(storagePaths, expiresInSeconds);
 
-  if (error) {
+    const urls = await Promise.all(
+      storagePaths.map(async (storagePath, index) => {
+        const signedUrl = data?.[index]?.signedUrl;
+        if (signedUrl) return signedUrl;
+        return getCachedMediaUrl(
+          storagePath.split('/')[0],
+          bucket as OfflineMediaBucket,
+          storagePath
+        );
+      })
+    );
+
+    const missingUrl = urls.some((url) => !url);
     return {
-      urls: [],
-      error: {
-        message: error.message,
-        userMessage: "Couldn't load some files. Try again.",
-      },
+      urls,
+      error: missingUrl
+        ? {
+            message: error?.message || 'One or more media URLs are unavailable.',
+            userMessage: "Couldn't load some files. Try again.",
+          }
+        : null,
+    };
+  } catch (cause) {
+    const urls = await resolveCachedUrls();
+    const missingUrl = urls.some((url) => !url);
+    return {
+      urls,
+      error: missingUrl
+        ? {
+            message: cause instanceof Error ? cause.message : 'Storage request failed.',
+            userMessage: "Couldn't load some files. Try again.",
+          }
+        : null,
     };
   }
-
-  return {
-    urls: (data || []).map((item) => item.signedUrl),
-    error: null,
-  };
 }
-
 /**
  * Downloads a file from storage as a Blob.
  */
