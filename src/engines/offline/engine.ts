@@ -1,16 +1,83 @@
 /**
  * Offline Engine
- * Tracks connectivity and storage usage, and limits cache cleanup to app-owned caches.
- * Media download and cross-device synchronization are not implemented in this engine.
+ * Tracks connectivity and browser storage, and provides an opt-in cache for
+ * world-scoped private media. App pages still require a network connection.
  */
 
 export const APP_CACHE_PREFIX = 'peshie-' as const;
 export const MEDIA_CACHE_NAME = 'peshie-media-v1' as const;
+const OFFLINE_MEDIA_PATH = '/__peshie_media_cache__';
+
+export type OfflineMediaBucket = 'photos' | 'videos' | 'audio' | 'thumbnails';
+
+export interface OfflineMediaAsset {
+  worldId: string;
+  bucket: OfflineMediaBucket;
+  storagePath: string;
+  signedUrl: string;
+  sizeBytes: number;
+}
+
+export interface OfflineCacheResult {
+  success: boolean;
+  bytes: number;
+}
 
 export interface OfflineStorageState {
   isOnline: boolean;
   usedBytes: number;
   quotaBytes: number;
+}
+
+export function isWorldScopedMediaPath(
+  worldId: string,
+  bucket: OfflineMediaBucket,
+  storagePath: string
+): boolean {
+  return Boolean(worldId) &&
+    storagePath.startsWith(`${worldId}/${bucket}/`) &&
+    !storagePath.split('/').some((segment) => segment === '.' || segment === '..');
+}
+
+export function buildOfflineMediaCacheUrl(
+  origin: string,
+  worldId: string,
+  bucket: OfflineMediaBucket,
+  storagePath: string
+): string {
+  const url = new URL(OFFLINE_MEDIA_PATH, origin);
+  url.searchParams.set('world', worldId);
+  url.searchParams.set('bucket', bucket);
+  url.searchParams.set('path', storagePath);
+  return url.toString();
+}
+
+export async function getCachedMediaUrl(
+  worldId: string,
+  bucket: OfflineMediaBucket,
+  storagePath: string
+): Promise<string | null> {
+  if (
+    typeof window === 'undefined' ||
+    !('caches' in window) ||
+    !isWorldScopedMediaPath(worldId, bucket, storagePath)
+  ) {
+    return null;
+  }
+
+  try {
+    const key = buildOfflineMediaCacheUrl(window.location.origin, worldId, bucket, storagePath);
+    const cache = await caches.open(MEDIA_CACHE_NAME);
+    const response = await cache.match(key);
+    if (!response) return null;
+
+    if ('serviceWorker' in navigator) {
+      await navigator.serviceWorker.ready;
+    }
+    return key;
+  } catch {
+    return null;
+  }
 }
 
 export class OfflineEngine {
@@ -34,6 +101,10 @@ export class OfflineEngine {
     this.state.isOnline = navigator.onLine;
     window.addEventListener('online', this.handleOnline);
     window.addEventListener('offline', this.handleOffline);
+
+    if ('serviceWorker' in navigator && window.isSecureContext) {
+      void navigator.serviceWorker.register('/sw.js', { scope: '/' }).catch(() => undefined);
+    }
     void this.estimateStorage();
   }
 
@@ -50,6 +121,49 @@ export class OfflineEngine {
       }
     }
     return this.getState();
+  }
+
+  public async cacheMediaAsset(asset: OfflineMediaAsset): Promise<OfflineCacheResult> {
+    if (
+      typeof window === 'undefined' ||
+      !('caches' in window) ||
+      !navigator.onLine ||
+      !isWorldScopedMediaPath(asset.worldId, asset.bucket, asset.storagePath) ||
+      !Number.isFinite(asset.sizeBytes) ||
+      asset.sizeBytes <= 0
+    ) {
+      return { success: false, bytes: 0 };
+    }
+
+    try {
+      const signedUrl = new URL(asset.signedUrl);
+      if (signedUrl.protocol !== 'https:') {
+        return { success: false, bytes: 0 };
+      }
+
+      const response = await fetch(signedUrl, { credentials: 'omit' });
+      if (!response.ok) return { success: false, bytes: 0 };
+
+      const headerSize = Number(response.headers.get('content-length'));
+      const actualSize = Number.isFinite(headerSize) && headerSize > 0
+        ? headerSize
+        : asset.sizeBytes;
+      if (actualSize <= 0) return { success: false, bytes: 0 };
+
+      const key = buildOfflineMediaCacheUrl(
+        window.location.origin,
+        asset.worldId,
+        asset.bucket,
+        asset.storagePath
+      );
+      const cache = await caches.open(MEDIA_CACHE_NAME);
+      await cache.put(key, response);
+      await this.estimateStorage();
+
+      return { success: true, bytes: actualSize };
+    } catch {
+      return { success: false, bytes: 0 };
+    }
   }
 
   /**

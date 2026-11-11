@@ -19,7 +19,9 @@ import { useTheme } from '@/features/settings';
 import { useMusic } from '@/engines/music';
 import { useOffline } from '@/engines/offline';
 import { useInstallation } from '@/engines/installation';
-import { worldRepo } from '@/lib/supabase/db';
+import { worldRepo, photosRepo, videosRepo, soundtrackRepo } from '@/lib/supabase/db';
+import { getSignedUrl } from '@/lib/storage/client';
+import type { OfflineMediaBucket } from '@/engines/offline/engine';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Spinner } from '@/components/ui/spinner';
@@ -31,12 +33,13 @@ export default function SettingsPage() {
   const { identity } = useWorldIdentity();
   const { theme, setTheme } = useTheme();
   const { engine, state: musicState } = useMusic();
-  const { usedMB, quotaMB, clearCache, refreshEstimate } = useOffline();
+  const { usedMB, quotaMB, clearCache, refreshEstimate, cacheMediaAsset, isOnline } = useOffline();
   const { isInstalled, isInstallable, promptInstall, platform } = useInstallation();
   const { showToast } = useToast();
 
   const [isSaving, setIsSaving] = useState(false);
   const [isClearing, setIsClearing] = useState(false);
+  const [isCaching, setIsCaching] = useState(false);
 
   const worldId = identity?.worldId ?? null;
 
@@ -78,6 +81,99 @@ export default function SettingsPage() {
       showToast("Couldn't clear cache.", 'error');
     } finally {
       setIsClearing(false);
+    }
+  };
+
+  const handleCacheMediaForOffline = async () => {
+    if (!worldId) {
+      showToast('Your private space is unavailable. Reconnect and try again.', 'error');
+      return;
+    }
+    if (!isOnline) {
+      showToast('Connect to the internet before saving media offline.', 'error');
+      return;
+    }
+
+    setIsCaching(true);
+    try {
+      const [photos, videos, tracks] = await Promise.all([
+        photosRepo.listByWorld(worldId),
+        videosRepo.listByWorld(worldId),
+        soundtrackRepo.listTracks(worldId),
+      ]);
+
+      const assets: Array<{
+        bucket: OfflineMediaBucket;
+        storagePath: string;
+        sizeBytes: number;
+      }> = [
+        ...(photos ?? []).flatMap((photo) => [
+          { bucket: 'photos' as const, storagePath: photo.storage_path, sizeBytes: photo.file_size },
+          ...(photo.thumbnail_path ? [{
+            bucket: 'thumbnails' as const,
+            storagePath: photo.thumbnail_path,
+            sizeBytes: 0,
+          }] : []),
+        ]),
+        ...(videos ?? []).flatMap((video) => [
+          { bucket: 'videos' as const, storagePath: video.storage_path, sizeBytes: video.file_size },
+          ...(video.thumbnail_path ? [{
+            bucket: 'thumbnails' as const,
+            storagePath: video.thumbnail_path,
+            sizeBytes: 0,
+          }] : []),
+        ]),
+        ...(tracks ?? []).map((track) => ({
+          bucket: 'audio' as const,
+          storagePath: track.storage_path,
+          sizeBytes: track.file_size,
+        })),
+      ];
+
+      const maxBytes = 1024 * 1024 * 1024;
+      let savedCount = 0;
+      let failedCount = 0;
+      let skippedCount = 0;
+      let savedBytes = 0;
+
+      for (const asset of assets) {
+        if (!asset.sizeBytes || asset.sizeBytes > maxBytes - savedBytes) {
+          skippedCount += 1;
+          continue;
+        }
+
+        const signed = await getSignedUrl(asset.bucket, asset.storagePath);
+        if (!signed.url) {
+          failedCount += 1;
+          continue;
+        }
+
+        const result = await cacheMediaAsset({
+          worldId,
+          bucket: asset.bucket,
+          storagePath: asset.storagePath,
+          signedUrl: signed.url,
+          sizeBytes: asset.sizeBytes,
+        });
+
+        if (result.success) {
+          savedCount += 1;
+          savedBytes += result.bytes;
+        } else {
+          failedCount += 1;
+        }
+      }
+
+      await refreshEstimate();
+      const savedMB = (savedBytes / (1024 * 1024)).toFixed(1);
+      showToast(
+        `Saved ${savedCount} media files (${savedMB} MB). ${failedCount} failed; ${skippedCount} skipped by the 1 GB limit or missing size metadata.`,
+        failedCount > 0 ? 'info' : 'success'
+      );
+    } catch {
+      showToast("Couldn't prepare your media for offline use.", 'error');
+    } finally {
+      setIsCaching(false);
     }
   };
 
@@ -230,18 +326,28 @@ export default function SettingsPage() {
               </div>
               <div>
                 <h2 className="text-base font-semibold text-primary-text">Browser Storage</h2>
-                <p className="text-xs text-secondary-text">Browser storage currently used by the app. Media downloads for offline use are not available yet.</p>
+                <p className="text-xs text-secondary-text">Save up to 1 GB of photos, videos, and soundtrack files on this device for offline media access. App pages still need a connection to load.</p>
               </div>
             </div>
 
-            <Button
-              size="sm"
-              variant="secondary"
-              onClick={handleClearCache}
-              disabled={isClearing}
-            >
-              {isClearing ? <Spinner size="sm" /> : 'Clear Cache'}
-            </Button>
+            <div className="flex flex-wrap gap-2 justify-end">
+              <Button
+                size="sm"
+                variant="secondary"
+                onClick={handleCacheMediaForOffline}
+                disabled={isCaching || !worldId || !isOnline}
+              >
+                {isCaching ? <Spinner size="sm" /> : 'Save Media Offline'}
+              </Button>
+              <Button
+                size="sm"
+                variant="secondary"
+                onClick={handleClearCache}
+                disabled={isClearing}
+              >
+                {isClearing ? <Spinner size="sm" /> : 'Clear Cache'}
+              </Button>
+            </div>
           </div>
 
           <div className="flex items-center justify-between p-3.5 rounded-xl bg-surface border border-border text-xs">

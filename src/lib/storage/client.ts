@@ -9,6 +9,7 @@
 import { getSupabaseBrowserClient } from '@/lib/supabase/client';
 import { type StorageBucket, buildStoragePath } from './constants';
 import { validateFile, type ValidationResult } from './validation';
+import { getCachedMediaUrl, type OfflineMediaBucket } from '@/engines/offline/engine';
 
 // ---------------------------------------------------------------------------
 // Result types
@@ -147,11 +148,19 @@ export async function getSignedUrl(
     .from(bucket)
     .createSignedUrl(storagePath, expiresInSeconds);
 
-  if (error) {
+  if (error || !data?.signedUrl) {
+    const worldId = storagePath.split('/')[0];
+    const cachedUrl = await getCachedMediaUrl(
+      worldId,
+      bucket as OfflineMediaBucket,
+      storagePath
+    );
+    if (cachedUrl) return { url: cachedUrl, error: null };
+
     return {
       url: null,
       error: {
-        message: error.message,
+        message: error?.message || 'No signed URL was returned.',
         userMessage: "Couldn't load this file right now. Try again.",
       },
     };
