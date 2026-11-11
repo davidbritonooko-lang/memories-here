@@ -70,7 +70,8 @@ export class InstallationEngine {
 
   private checkStandalone() {
     const isStandalone =
-      window.matchMedia('(display-mode: standalone)').matches ||
+      (typeof window.matchMedia === 'function' &&
+        window.matchMedia('(display-mode: standalone)').matches) ||
       (navigator as unknown as { standalone?: boolean }).standalone === true;
 
     this.state.isStandalone = isStandalone;
@@ -88,16 +89,20 @@ export class InstallationEngine {
       return false;
     }
 
+    const promptEvent = this.deferredPrompt;
+    this.deferredPrompt = null;
+
     try {
-      await this.deferredPrompt.prompt();
-      const choice = await this.deferredPrompt.userChoice;
-      if (choice.outcome === 'accepted') {
-        this.updateState({ isInstalled: true, isInstallable: false });
-        this.deferredPrompt = null;
-        return true;
-      }
-      return false;
+      await promptEvent.prompt();
+      const choice = await promptEvent.userChoice;
+      const accepted = choice.outcome === 'accepted';
+      this.updateState({
+        isInstalled: accepted || this.state.isInstalled,
+        isInstallable: false,
+      });
+      return accepted;
     } catch {
+      this.updateState({ isInstallable: false });
       return false;
     }
   }

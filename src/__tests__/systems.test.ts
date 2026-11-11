@@ -42,6 +42,24 @@ describe('Phase 17 to 21 Acceptance Tests', () => {
       const result = await engine.promptInstall();
       expect(result).toBe(false);
     });
+
+    it('consumes a dismissed install prompt and does not reuse it', async () => {
+      const prompt = vi.fn().mockResolvedValue(undefined);
+      const event = new Event('beforeinstallprompt', { cancelable: true }) as Event & {
+        prompt: () => Promise<void>;
+        userChoice: Promise<{ outcome: 'accepted' | 'dismissed' }>;
+      };
+      event.prompt = prompt;
+      event.userChoice = Promise.resolve({ outcome: 'dismissed' });
+      window.dispatchEvent(event);
+
+      expect(engine.getState().isInstallable).toBe(true);
+      await expect(engine.promptInstall()).resolves.toBe(false);
+      expect(prompt).toHaveBeenCalledTimes(1);
+      expect(engine.getState().isInstallable).toBe(false);
+      await expect(engine.promptInstall()).resolves.toBe(false);
+      expect(prompt).toHaveBeenCalledTimes(1);
+    });
   });
 
   // ---------------------------------------------------------------------------
