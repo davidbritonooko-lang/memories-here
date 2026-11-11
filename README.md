@@ -103,7 +103,7 @@ project. Do not use production credentials to run tests.
 - Replaced race-prone client track numbering with an atomic database function
   and stopped querying track numbers before validating uploads.
 - Added world-scoped transactional archive restore and purge operations. Purges enqueue private Storage objects for deletion; the authenticated cleanup endpoint processes them on archive visits, and a daily Vercel Cron retries pending jobs. The queue is protected by RLS and the purge function runs with invoker privileges.
-- Added opt-in, world-scoped local caching for photos, videos, and soundtrack media. A service worker serves cached media after a network failure; app pages themselves still require connectivity. Offline media caches are cleared on logout and when the active world changes.
+- Added opt-in, world-scoped local caching for photos, videos, and soundtrack media. A service worker serves cached media after a network failure; app pages themselves still require connectivity. Offline media caches are cleared on logout, when the active world changes, and after permanent archive deletion. Cached media is stored in browser Cache Storage and is not separately encrypted.
 - Replaced relationship-oriented onboarding with neutral private-space setup and updated home greetings.
 - Removed silent empty-library fallbacks so soundtrack load failures are reported to the user.
 - Added server configuration and setup guidance, clarified the phase roadmap,

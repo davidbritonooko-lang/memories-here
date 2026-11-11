@@ -236,7 +236,7 @@ export class OfflineEngine {
     try {
       const keys = await caches.keys();
       const ownedKeys = keys.filter((key) => key.startsWith(APP_CACHE_PREFIX));
-      if (ownedKeys.length === 0) return false;
+      if (ownedKeys.length === 0) return true;
 
       const deleted = await Promise.all(ownedKeys.map((key) => caches.delete(key)));
       await this.estimateStorage();

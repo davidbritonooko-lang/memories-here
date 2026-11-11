@@ -4,6 +4,7 @@ import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { Archive, Sparkles, Filter } from 'lucide-react';
 import { useWorldIdentity } from '@/features/identity';
 import { archiveRepo } from '@/lib/supabase/db';
+import { useOffline } from '@/engines/offline';
 import { useToast } from '@/components/ui/toast';
 import { Tabs } from '@/components/ui/tabs';
 import { Spinner } from '@/components/ui/spinner';
@@ -16,6 +17,7 @@ type FilterType = 'all' | EntityType;
 export default function ArchivePage() {
   const { identity } = useWorldIdentity();
   const { showToast } = useToast();
+  const { clearCache, refreshEstimate } = useOffline();
 
   const [items, setItems] = useState<EnrichedArchiveItem[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -95,6 +97,10 @@ export default function ArchivePage() {
     try {
       await archiveRepo.permanentlyDelete(item.id, item.entity_type, item.entity_id);
 
+      // Purged media must not remain available from this device's offline cache.
+      await clearCache();
+      await refreshEstimate();
+
       let cleanupPending = true;
       try {
         const response = await fetch('/api/storage/cleanup', {
@@ -112,8 +118,8 @@ export default function ArchivePage() {
       setItems((prev) => prev.filter((i) => i.id !== item.id));
       showToast(
         cleanupPending
-          ? 'Record removed. Media cleanup is queued and will retry on your next visit.'
-          : `Permanently deleted ${item.entity_type} and its stored media.`,
+          ? 'Record removed. Server media cleanup is queued and will retry; this device’s offline media cache was cleared.'
+          : `Permanently deleted ${item.entity_type}, its stored media, and this device’s offline cache.`,
         cleanupPending ? 'error' : 'info'
       );
     } catch {

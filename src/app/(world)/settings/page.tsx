@@ -339,7 +339,7 @@ export default function SettingsPage() {
               </div>
               <div>
                 <h2 className="text-base font-semibold text-primary-text">Browser Storage</h2>
-                <p className="text-xs text-secondary-text">Save up to 1 GB of photos, videos, and soundtrack files on this device for offline media access. App pages still need a connection to load.</p>
+                <p className="text-xs text-secondary-text">Save up to 1 GB of photos, videos, and soundtrack files on this device for offline media access. Cached files are not separately encrypted; only save them on a device you control. App pages still need a connection to load.</p>
               </div>
             </div>
 
