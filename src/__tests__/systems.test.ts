@@ -4,7 +4,7 @@
  * Specification Sections: 6, 7, 29, 30, 31, 32, 48
  */
 
-import { describe, it, expect, beforeEach, vi } from 'vitest';
+import { afterEach, describe, it, expect, beforeEach, vi } from 'vitest';
 import { InstallationEngine } from '@/engines/installation/engine';
 import { OfflineEngine } from '@/engines/offline/engine';
 import { getAmbientGreeting } from '@/features/home/greeting';
@@ -19,6 +19,10 @@ describe('Phase 17 to 21 Acceptance Tests', () => {
 
     beforeEach(() => {
       engine = new InstallationEngine();
+    });
+
+    afterEach(() => {
+      engine.destroy();
     });
 
     it('initializes with platform detection and install state', () => {
@@ -70,6 +74,10 @@ describe('Phase 17 to 21 Acceptance Tests', () => {
 
     beforeEach(() => {
       engine = new OfflineEngine();
+    });
+
+    afterEach(() => {
+      engine.destroy();
     });
 
     it('tracks online status and storage estimates', () => {

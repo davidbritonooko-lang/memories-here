@@ -29,6 +29,17 @@ export class InstallationEngine {
   };
   private listeners: Set<(state: InstallationState) => void> = new Set();
 
+  private readonly handleBeforeInstallPrompt = (event: Event) => {
+    event.preventDefault();
+    this.deferredPrompt = event as BeforeInstallPromptEvent;
+    this.updateState({ isInstallable: true });
+  };
+
+  private readonly handleAppInstalled = () => {
+    this.deferredPrompt = null;
+    this.updateState({ isInstalled: true, isInstallable: false });
+  };
+
   constructor() {
     if (typeof window !== 'undefined') {
       this.init();
@@ -40,17 +51,10 @@ export class InstallationEngine {
     this.checkStandalone();
 
     // Listen for beforeinstallprompt (Chromium / Android)
-    window.addEventListener('beforeinstallprompt', (e) => {
-      e.preventDefault();
-      this.deferredPrompt = e as BeforeInstallPromptEvent;
-      this.updateState({ isInstallable: true });
-    });
+    window.addEventListener('beforeinstallprompt', this.handleBeforeInstallPrompt);
 
     // Listen for appinstalled
-    window.addEventListener('appinstalled', () => {
-      this.deferredPrompt = null;
-      this.updateState({ isInstalled: true, isInstallable: false });
-    });
+    window.addEventListener('appinstalled', this.handleAppInstalled);
   }
 
   private detectPlatform() {
@@ -105,6 +109,15 @@ export class InstallationEngine {
       this.updateState({ isInstallable: false });
       return false;
     }
+  }
+
+  public destroy(): void {
+    if (typeof window !== 'undefined') {
+      window.removeEventListener('beforeinstallprompt', this.handleBeforeInstallPrompt);
+      window.removeEventListener('appinstalled', this.handleAppInstalled);
+    }
+    this.deferredPrompt = null;
+    this.listeners.clear();
   }
 
   public subscribe(listener: (state: InstallationState) => void): () => void {
