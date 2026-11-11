@@ -18,7 +18,7 @@ import { PlayfulIdentityGate } from '@/features/identity/PlayfulIdentityGate';
 describe('Phase 4: World Identity Acceptance Tests', () => {
   const serverIdentity = {
     worldId: '23b3a87f-8ca1-4d7f-9afd-c194b6b993af',
-    displayName: 'Peshie',
+    displayName: 'Taylor',
     isIdentified: true,
     createdAt: new Date().toISOString(),
     lastAccessedAt: new Date().toISOString(),
@@ -95,7 +95,7 @@ describe('Phase 4: World Identity Acceptance Tests', () => {
     it('persists display identity without persisting its access key', () => {
       const identity = {
         worldId: '23b3a87f-8ca1-4d7f-9afd-c194b6b993af',
-        displayName: 'Peshie',
+        displayName: 'Taylor',
         accessIdentity: 'a'.repeat(64),
         isIdentified: true,
         createdAt: new Date().toISOString(),
@@ -126,8 +126,8 @@ describe('Phase 4: World Identity Acceptance Tests', () => {
         </WorldIdentityProvider>
       );
 
-      // Verify exact specification phrase: "who's the pretty girl around here?"
-      expect(await screen.findByText(/who's the pretty girl/i)).toBeDefined();
+      // The onboarding prompt uses neutral, non-romantic language.
+      expect(await screen.findByText(/what should we call you/i)).toBeDefined();
 
       // Verify it does NOT contain email/password fields
       expect(screen.queryByLabelText(/email/i)).toBeNull();
@@ -137,7 +137,7 @@ describe('Phase 4: World Identity Acceptance Tests', () => {
       expect(screen.queryByTestId('world-content')).toBeNull();
     });
 
-    it('identifies her name and transitions with "I\'ll remember you forever."', async () => {
+    it('identifies the user and confirms the private space is ready', async () => {
       render(
         <WorldIdentityProvider>
           <PlayfulIdentityGate>
@@ -147,14 +147,14 @@ describe('Phase 4: World Identity Acceptance Tests', () => {
       );
 
       const input = await screen.findByPlaceholderText(/your name.../i);
-      fireEvent.change(input, { target: { value: 'Peshie' } });
+      fireEvent.change(input, { target: { value: 'Taylor' } });
 
       const submitButton = screen.getByRole('button', { name: /it's me/i });
       fireEvent.click(submitButton);
 
       // Verify specification transition phrase
-      expect(await screen.findByText(/I'll remember you forever\./i)).toBeDefined();
-      expect(await screen.findByText(/welcome home, peshie/i)).toBeDefined();
+      expect(await screen.findByText(/your space is ready/i)).toBeDefined();
+      expect(await screen.findByText(/welcome, taylor/i)).toBeDefined();
 
       // World content should now be unlocked after transition completes
       const content = await screen.findByTestId('world-content', {}, { timeout: 3000 });
@@ -163,7 +163,7 @@ describe('Phase 4: World Identity Acceptance Tests', () => {
       // The recovery key is kept locally; the cached identity omits it.
       const stored = getStoredWorldIdentity();
       expect(stored).not.toBeNull();
-      expect(stored?.displayName).toBe('Peshie');
+      expect(stored?.displayName).toBe('Taylor');
       expect(stored?.isIdentified).toBe(true);
       expect(stored?.accessIdentity).toBeUndefined();
       expect(getStoredAccessIdentity()).toMatch(/^[a-f\d]{64}$/i);
@@ -188,7 +188,7 @@ describe('Phase 4: World Identity Acceptance Tests', () => {
       );
 
       expect(await screen.findByTestId('world-content')).toBeDefined();
-      expect(screen.queryByText(/who's the pretty girl/i)).toBeNull();
+      expect(screen.queryByText(/what should we call you/i)).toBeNull();
     });
   });
 

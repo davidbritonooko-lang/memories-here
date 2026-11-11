@@ -606,22 +606,6 @@ export interface Database {
         };
         Returns: string;
       };
-      restore_archived_world_entity: {
-        Args: {
-          p_archive_item_id: string;
-          p_entity_id: string;
-          p_entity_type: 'moment' | 'photo' | 'video' | 'track';
-        };
-        Returns: string;
-      };
-      purge_archived_world_entity: {
-        Args: {
-          p_archive_item_id: string;
-          p_entity_id: string;
-          p_entity_type: 'moment' | 'photo' | 'video' | 'track';
-        };
-        Returns: string;
-      };
       create_next_track: {
         Args: {
           p_file_size: number;

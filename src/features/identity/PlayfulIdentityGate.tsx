@@ -2,7 +2,7 @@
 
 import React, { useEffect, useRef, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Sparkles, Heart } from 'lucide-react';
+import { Sparkles } from 'lucide-react';
 import { useWorldIdentity } from './WorldIdentityProvider';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -54,14 +54,14 @@ export function PlayfulIdentityGate({ children }: PlayfulIdentityGateProps) {
     if (e) e.preventDefault();
     const trimmed = name.trim();
     if (!trimmed) {
-      setError('Tell me what you like to be called.');
+      setError('Enter a name to continue.');
       return;
     }
 
     setError(null);
     setStep('remembering');
 
-    // Display "I'll remember you forever." for an emotional beat before entering
+    // Briefly transition before creating the private space.
     const delay = process.env.NODE_ENV === 'test' ? 1200 : 1800;
     submitTimer.current = setTimeout(() => {
       void identifyWorld(trimmed).catch((cause: unknown) => {
@@ -96,15 +96,12 @@ export function PlayfulIdentityGate({ children }: PlayfulIdentityGateProps) {
                 <Sparkles className="w-5 h-5" />
               </div>
 
-              {/* Specification exact phrase: "who's the pretty girl around here?" */}
               <h1 className="font-editorial text-3xl sm:text-4xl font-semibold text-[#171518] dark:text-[#F5F1F4] tracking-tight leading-snug">
-                who&apos;s the pretty girl
-                <br />
-                around here?
+                What should we call you?
               </h1>
 
               <p className="mt-3 text-xs sm:text-sm text-[#6F6A70] dark:text-[#AAA3AC] max-w-xs font-ui">
-                A little corner of the internet that belongs to you.
+                A private space for moments, media, and memories.
               </p>
 
               <form onSubmit={handleSubmit} className="w-full mt-8 flex flex-col gap-4">
@@ -127,7 +124,7 @@ export function PlayfulIdentityGate({ children }: PlayfulIdentityGateProps) {
                   className="w-full mt-2"
                   disabled={step !== 'prompt'}
                 >
-                  It&apos;s me
+                  Continue
                 </Button>
               </form>
             </motion.div>
@@ -141,16 +138,15 @@ export function PlayfulIdentityGate({ children }: PlayfulIdentityGateProps) {
               className="flex flex-col items-center"
             >
               <div className="mb-6 inline-flex p-3.5 rounded-full bg-[#EEDCE4]/60 dark:bg-[#3A2934]/60 text-[#B96F91] dark:text-[#D59AB6] animate-pulse">
-                <Heart className="w-6 h-6 fill-current" />
+                <Sparkles className="w-6 h-6" />
               </div>
 
-              {/* Specification exact phrase: "I'll remember you forever." */}
               <h2 className="font-editorial text-3xl sm:text-4xl font-semibold text-[#171518] dark:text-[#F5F1F4] tracking-tight">
-                I&apos;ll remember you forever.
+                Your space is ready.
               </h2>
 
               <p className="mt-3 font-editorial italic text-lg text-[#B96F91] dark:text-[#D59AB6]">
-                Welcome home, {name.trim()}.
+                Welcome, {name.trim()}.
               </p>
             </motion.div>
           )}
