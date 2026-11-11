@@ -6,7 +6,7 @@
 
 import { afterEach, describe, it, expect, beforeEach, vi } from 'vitest';
 import { InstallationEngine } from '@/engines/installation/engine';
-import { OfflineEngine } from '@/engines/offline/engine';
+import { OfflineEngine, buildOfflineMediaCacheUrl, isWorldScopedMediaPath } from '@/engines/offline/engine';
 import { getAmbientGreeting } from '@/features/home/greeting';
 import { worldRepo } from '@/lib/supabase/db';
 
@@ -78,6 +78,27 @@ describe('Phase 17 to 21 Acceptance Tests', () => {
 
     afterEach(() => {
       engine.destroy();
+    });
+
+    it('accepts only media paths scoped to the requested world and bucket', () => {
+      expect(isWorldScopedMediaPath('world-1', 'photos', 'world-1/photos/image.jpg')).toBe(true);
+      expect(isWorldScopedMediaPath('world-1', 'photos', 'world-2/photos/image.jpg')).toBe(false);
+      expect(isWorldScopedMediaPath('world-1', 'photos', 'world-1/videos/clip.mp4')).toBe(false);
+      expect(isWorldScopedMediaPath('world-1', 'photos', 'world-1/photos/../other/file.jpg')).toBe(false);
+    });
+
+    it('builds a same-origin cache key without losing path identity', () => {
+      const key = new URL(buildOfflineMediaCacheUrl(
+        'https://peshie.example',
+        'world-1',
+        'photos',
+        'world-1/photos/a photo.jpg'
+      ));
+      expect(key.origin).toBe('https://peshie.example');
+      expect(key.pathname).toBe('/__peshie_media_cache__');
+      expect(key.searchParams.get('world')).toBe('world-1');
+      expect(key.searchParams.get('bucket')).toBe('photos');
+      expect(key.searchParams.get('path')).toBe('world-1/photos/a photo.jpg');
     });
 
     it('tracks online status and storage estimates', () => {

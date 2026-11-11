@@ -116,18 +116,17 @@ describe('Phase 4: World Identity Acceptance Tests', () => {
     });
   });
 
-  describe('Playful Identity Experience (Spec Section 11)', () => {
-    it('presents the playful question instead of conventional login', async () => {
+  describe('Private Space Onboarding (Spec Section 11)', () => {
+    it('presents neutral private-space onboarding instead of conventional login', async () => {
       render(
         <WorldIdentityProvider>
           <PlayfulIdentityGate>
-            <div data-testid="world-content">Her World Content</div>
+            <div data-testid="world-content">Private Archive Content</div>
           </PlayfulIdentityGate>
         </WorldIdentityProvider>
       );
 
-      // Verify exact specification phrase: "who's the pretty girl around here?"
-      expect(await screen.findByText(/who's the pretty girl/i)).toBeDefined();
+      expect(await screen.findByText(/welcome to peshie/i)).toBeDefined();
 
       // Verify it does NOT contain email/password fields
       expect(screen.queryByLabelText(/email/i)).toBeNull();
@@ -149,15 +148,10 @@ describe('Phase 4: World Identity Acceptance Tests', () => {
       const input = await screen.findByPlaceholderText(/your name.../i);
       fireEvent.change(input, { target: { value: 'Peshie' } });
 
-      const submitButton = screen.getByRole('button', { name: /it's me/i });
+      const submitButton = screen.getByRole('button', { name: /create private space/i });
       fireEvent.click(submitButton);
 
-      // Verify specification transition phrase
-      expect(await screen.findByText(/I'll remember you forever\./i)).toBeDefined();
-      expect(await screen.findByText(/welcome home, peshie/i)).toBeDefined();
-
-      // World content should now be unlocked after transition completes
-      const content = await screen.findByTestId('world-content', {}, { timeout: 3000 });
+      const content = await screen.findByTestId('world-content');
       expect(content).toBeDefined();
 
       // The recovery key is kept locally; the cached identity omits it.
@@ -193,7 +187,7 @@ describe('Phase 4: World Identity Acceptance Tests', () => {
   });
 
   describe('New Phone Restoration (Spec Section 2)', () => {
-    it('restores her world when providing an access token', async () => {
+    it('restores the private space when providing an access token', async () => {
       const wrapper = ({ children }: { children: React.ReactNode }) => (
         <WorldIdentityProvider>{children}</WorldIdentityProvider>
       );

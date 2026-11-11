@@ -112,7 +112,7 @@ export default function SettingsPage() {
           ...(photo.thumbnail_path ? [{
             bucket: 'thumbnails' as const,
             storagePath: photo.thumbnail_path,
-            sizeBytes: 0,
+            sizeBytes: 5 * 1024 * 1024,
           }] : []),
         ]),
         ...(videos ?? []).flatMap((video) => [

@@ -16,7 +16,7 @@ control issues found before starting the next feature phase.
 | 4–9 | Identity, database, storage, media, music engine, and soundtrack library | Baseline implemented; identity and authorization hardened in this pass |
 | 10 | Moments list and creation | Initial implementation; detail route remains a stub |
 | **11–12** | **Moment Engine and moment detail experience** | **Next phase; not started** |
-| 13 | Archive | Initial UI and transactional database operations; media-object cleanup still needs implementation |
+| 13 | Archive | Transactional restore/purge with a durable private Storage cleanup queue |
 | 14–16 | PeshTok | Stub |
 | 20 | Settings | Stub |
 | 21 | Home experience | Stub |
@@ -102,8 +102,9 @@ project. Do not use production credentials to run tests.
   fails. Upload success now requires a valid signed URL.
 - Replaced race-prone client track numbering with an atomic database function
   and stopped querying track numbers before validating uploads.
-- Added world-scoped transactional archive restore and purge operations. Purges enqueue private Storage objects for deletion; the authenticated cleanup endpoint processes them on archive visits, and a daily Vercel Cron retries pending jobs.
-- Removed silent empty-library fallbacks so soundtrack load failures are
-  reported to the user.
+- Added world-scoped transactional archive restore and purge operations. Purges enqueue private Storage objects for deletion; the authenticated cleanup endpoint processes them on archive visits, and a daily Vercel Cron retries pending jobs. The queue is protected by RLS and the purge function runs with invoker privileges.
+- Added opt-in, world-scoped local caching for photos, videos, and soundtrack media. A service worker serves cached media after a network failure; app pages themselves still require connectivity. Offline media caches are cleared on logout and when the active world changes.
+- Replaced relationship-oriented onboarding with neutral private-space setup and updated home greetings.
+- Removed silent empty-library fallbacks so soundtrack load failures are reported to the user.
 - Added server configuration and setup guidance, clarified the phase roadmap,
   and expanded tests for authenticated access, sequential playback, archive transactions, and cache isolation.

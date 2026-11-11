@@ -1,6 +1,14 @@
 const MEDIA_CACHE_NAME = 'peshie-media-v1';
 const MEDIA_CACHE_PATH = '/__peshie_media_cache__';
 
+self.addEventListener('install', (event) => {
+  event.waitUntil(self.skipWaiting());
+});
+
+self.addEventListener('activate', (event) => {
+  event.waitUntil(self.clients.claim());
+});
+
 self.addEventListener('fetch', (event) => {
   const requestUrl = new URL(event.request.url);
   if (
