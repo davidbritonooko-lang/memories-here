@@ -90,7 +90,7 @@ export function CommentsDrawer({
       isOpen={isOpen}
       onClose={onClose}
       title={`Comments (${comments.length})`}
-      description="Love, thoughts, and tender words."
+      description="Comments and notes for this clip."
     >
       <div className="flex flex-col gap-4 max-h-[60vh]">
         {/* Comments List */}
@@ -108,7 +108,7 @@ export function CommentsDrawer({
                 onClick={handleSimulateCozyComment}
                 className="mt-2 text-accent text-xs"
               >
-                <Sparkles className="w-3.5 h-3.5 mr-1" /> Summon warm love
+                <Sparkles className="w-3.5 h-3.5 mr-1" /> Add example comment
               </Button>
             </div>
           ) : (
@@ -127,7 +127,7 @@ export function CommentsDrawer({
                       {comment.author_name}
                     </span>
                     {comment.is_simulated && (
-                      <span className="text-[10px] text-accent/80 font-mono">✨</span>
+                      <span className="text-[10px] text-accent/80 font-mono">SAMPLE</span>
                     )}
                     <span className="text-[10px] text-muted-text ml-auto">
                       {formatMomentDate(comment.created_at, 'short')}
@@ -145,7 +145,7 @@ export function CommentsDrawer({
         {/* Input Bar */}
         <form onSubmit={handleAddComment} className="flex items-center gap-2 pt-2 border-t border-border">
           <Input
-            placeholder="Add a loving thought..."
+            placeholder="Add a comment..."
             value={newCommentText}
             onChange={(e) => setNewCommentText(e.target.value)}
             className="flex-1 text-xs"
@@ -160,7 +160,7 @@ export function CommentsDrawer({
             variant="secondary"
             size="sm"
             onClick={handleSimulateCozyComment}
-            title="Summon loving comment"
+            title="Add generated sample comment"
           >
             <Sparkles className="w-4 h-4 text-accent" />
           </Button>
