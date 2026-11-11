@@ -136,16 +136,16 @@ describe('Phase 4: World Identity Acceptance Tests', () => {
       expect(screen.queryByTestId('world-content')).toBeNull();
     });
 
-    it('identifies her name and transitions with "I\'ll remember you forever."', async () => {
+    it('creates a private space using the supplied display name', async () => {
       render(
         <WorldIdentityProvider>
           <PlayfulIdentityGate>
-            <div data-testid="world-content">Her World Content</div>
+            <div data-testid="world-content">Private Archive Content</div>
           </PlayfulIdentityGate>
         </WorldIdentityProvider>
       );
 
-      const input = await screen.findByPlaceholderText(/your name.../i);
+      const input = await screen.findByPlaceholderText(/name your private space/i);
       fireEvent.change(input, { target: { value: 'Peshie' } });
 
       const submitButton = screen.getByRole('button', { name: /create private space/i });

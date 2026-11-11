@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach, vi } from 'vitest';
+import { afterEach, describe, it, expect, beforeEach, vi } from 'vitest';
 import { MusicEngine } from '@/engines/music/engine';
 import type { Track } from '@/types';
 
@@ -30,7 +30,28 @@ describe('Phase 8: Music Engine Acceptance Tests', () => {
   let engine: MusicEngine;
 
   beforeEach(() => {
+    vi.stubGlobal('Audio', vi.fn(function AudioMock() {
+      return {
+        currentTime: 0,
+        duration: 180,
+        volume: 1,
+        preload: '',
+        src: '',
+        load: vi.fn(),
+        play: vi.fn().mockResolvedValue(undefined),
+        pause: vi.fn(),
+        removeAttribute: vi.fn(),
+        ontimeupdate: null,
+        ondurationchange: null,
+        onended: null,
+        onerror: null,
+      };
+    }));
     engine = new MusicEngine(async (track) => `https://audio.example/${track.id}`);
+  });
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
   });
 
   describe('Global Music Engine State Model (Spec Section 22)', () => {
@@ -116,7 +137,7 @@ describe('Phase 8: Music Engine Acceptance Tests', () => {
         onended: null,
         onerror: null,
       } as unknown as HTMLAudioElement;
-      vi.stubGlobal('Audio', vi.fn(() => audio));
+      vi.stubGlobal('Audio', vi.fn(function AudioMock() { return audio; }));
 
       const resolveTrackUrl = vi.fn(async (track: Track) => `https://audio.example/${track.id}`);
       const contextEngine = new MusicEngine(resolveTrackUrl);
@@ -153,7 +174,7 @@ describe('Phase 8: Music Engine Acceptance Tests', () => {
         onended: null,
         onerror: null,
       } as unknown as HTMLAudioElement;
-      vi.stubGlobal('Audio', vi.fn(() => audio));
+      vi.stubGlobal('Audio', vi.fn(function AudioMock() { return audio; }));
 
       const contextEngine = new MusicEngine(async (track) => `https://audio.example/${track.id}`);
       contextEngine.requestContext('moment:mom-empty');

@@ -4,7 +4,7 @@ const { rpcMock } = vi.hoisted(() => ({
   rpcMock: vi.fn(),
 }));
 
-vi.mock('@/lib/supabase/client', () => ({
+vi.mock('../lib/supabase/client', () => ({
   getSupabaseBrowserClient: () => ({ rpc: rpcMock }),
 }));
 
