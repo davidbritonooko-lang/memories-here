@@ -12,6 +12,7 @@ import {
   Settings,
 } from 'lucide-react';
 import { cn } from '@/utils/cn';
+import { APP_NAME } from '@/types/constants';
 
 interface NavItem {
   id: string;
@@ -46,7 +47,7 @@ export function SideNav() {
       <div className="px-6 py-6 border-b border-[#E8E3E6]/50 dark:border-[#29252C]/50">
         <Link href="/" className="group inline-flex items-baseline gap-1.5">
           <span className="font-editorial text-2xl font-semibold text-[#171518] dark:text-[#F5F1F4] tracking-tight group-hover:text-[#B96F91] dark:group-hover:text-[#D59AB6] transition-colors">
-            Peshie
+            {APP_NAME}
           </span>
           <span className="font-ui text-xs text-[#9A949B] dark:text-[#77717A] tracking-widest uppercase">
             Her World
