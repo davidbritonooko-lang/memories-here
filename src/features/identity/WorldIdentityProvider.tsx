@@ -10,7 +10,6 @@ import React, {
 } from 'react';
 import {
   WorldIdentity,
-  getStoredWorldIdentity,
   setStoredWorldIdentity,
   getStoredAccessIdentity,
   setStoredAccessIdentity,
@@ -23,51 +22,28 @@ interface WorldIdentityContextType {
   identity: WorldIdentity | null;
   isIdentified: boolean;
   isLoading: boolean;
+  identityError: string | null;
   identifyWorld: (name: string) => Promise<WorldIdentity>;
   restoreWorldWithToken: (token: string) => Promise<boolean>;
-  resetIdentity: () => void;
+  resetIdentity: () => Promise<void>;
 }
 
 const WorldIdentityContext = createContext<WorldIdentityContextType | undefined>(
   undefined
 );
 
-function getInitialIdentity(): WorldIdentity | null {
-  if (typeof window === 'undefined') return null;
+interface IdentityResponse {
+  identity: WorldIdentity;
+}
 
-  let activeToken = getStoredAccessIdentity();
-  const currentIdentity = getStoredWorldIdentity();
-
-  // Check URL parameter (?access=... or ?key=...)
-  if (window.location.search) {
-    const urlToken = extractAccessIdentityFromUrl(window.location.search);
-    if (urlToken) {
-      activeToken = urlToken;
-      setStoredAccessIdentity(urlToken);
-    }
+async function readIdentityResponse(response: Response): Promise<WorldIdentity> {
+  const body = (await response.json()) as IdentityResponse | { error?: string };
+  if (!response.ok || !('identity' in body)) {
+    throw new Error(
+      'error' in body && body.error ? body.error : 'World identity could not be loaded.'
+    );
   }
-
-  if (currentIdentity && currentIdentity.isIdentified) {
-    const updated: WorldIdentity = {
-      ...currentIdentity,
-      lastAccessedAt: new Date().toISOString(),
-    };
-    setStoredWorldIdentity(updated);
-    return updated;
-  }
-
-  if (activeToken) {
-    return {
-      worldId: 'world_' + activeToken.substring(0, 12),
-      displayName: '',
-      accessIdentity: activeToken,
-      isIdentified: false,
-      createdAt: new Date().toISOString(),
-      lastAccessedAt: new Date().toISOString(),
-    };
-  }
-
-  return null;
+  return body.identity;
 }
 
 export function WorldIdentityProvider({
@@ -75,81 +51,126 @@ export function WorldIdentityProvider({
 }: {
   children: React.ReactNode;
 }) {
-  const [identity, setIdentity] = useState<WorldIdentity | null>(getInitialIdentity);
-  const [isLoading] = useState<boolean>(false);
-
-  // Sanitize visible URL query params if a sensitive access key was used
-  useEffect(() => {
-    if (typeof window === 'undefined' || !window.location.search) return;
-
-    const urlToken = extractAccessIdentityFromUrl(window.location.search);
-    if (urlToken) {
-      try {
-        const cleanUrl = new URL(window.location.href);
-        cleanUrl.searchParams.delete('access');
-        cleanUrl.searchParams.delete('key');
-        window.history.replaceState({}, document.title, cleanUrl.pathname + cleanUrl.search);
-      } catch {
-        // Ignore
-      }
-    }
-  }, []);
-
-  const identifyWorld = useCallback(
-    async (name: string): Promise<WorldIdentity> => {
-      const trimmedName = name.trim();
-      const existingToken =
-        identity?.accessIdentity || getStoredAccessIdentity() || generateAccessIdentity();
-      const worldId = identity?.worldId || 'world_' + existingToken.substring(0, 12);
-
-      const newIdentity: WorldIdentity = {
-        worldId,
-        displayName: trimmedName,
-        accessIdentity: existingToken,
-        isIdentified: true,
-        createdAt: identity?.createdAt || new Date().toISOString(),
-        lastAccessedAt: new Date().toISOString(),
-      };
-
-      setStoredAccessIdentity(existingToken);
-      setStoredWorldIdentity(newIdentity);
-      setIdentity(newIdentity);
-
-      return newIdentity;
-    },
-    [identity]
-  );
+  const [identity, setIdentity] = useState<WorldIdentity | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
+  const [identityError, setIdentityError] = useState<string | null>(null);
 
   const restoreWorldWithToken = useCallback(
     async (token: string): Promise<boolean> => {
-      if (!token || token.trim().length === 0) return false;
-
       const cleanToken = token.trim();
+      if (!/^[a-f\d]{64}$/i.test(cleanToken)) return false;
+
+      const response = await fetch('/api/identity', {
+        method: 'POST',
+        credentials: 'same-origin',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'restore', accessIdentity: cleanToken }),
+      });
+
+      if (response.status === 401) return false;
+      const restored = await readIdentityResponse(response);
       setStoredAccessIdentity(cleanToken);
-
-      const stored = getStoredWorldIdentity();
-      if (stored && stored.accessIdentity === cleanToken) {
-        setIdentity(stored);
-        return true;
-      }
-
-      const restored: WorldIdentity = {
-        worldId: 'world_' + cleanToken.substring(0, 12),
-        displayName: 'Peshie',
-        accessIdentity: cleanToken,
-        isIdentified: true,
-        createdAt: new Date().toISOString(),
-        lastAccessedAt: new Date().toISOString(),
-      };
-
       setStoredWorldIdentity(restored);
       setIdentity(restored);
+      setIdentityError(null);
       return true;
     },
     []
   );
 
-  const resetIdentity = useCallback(() => {
+  useEffect(() => {
+    let cancelled = false;
+
+    const loadIdentity = async () => {
+      try {
+        const urlToken = extractAccessIdentityFromUrl(window.location.search);
+        if (urlToken) {
+          const cleanUrl = new URL(window.location.href);
+          cleanUrl.searchParams.delete('access');
+          cleanUrl.searchParams.delete('key');
+          window.history.replaceState({}, document.title, cleanUrl.pathname + cleanUrl.search);
+
+          if (await restoreWorldWithToken(urlToken)) return;
+          clearStoredWorldIdentity();
+        }
+
+        const response = await fetch('/api/identity', {
+          credentials: 'same-origin',
+          cache: 'no-store',
+        });
+        if (response.ok) {
+          const restored = await readIdentityResponse(response);
+          if (!cancelled) {
+            setIdentity(restored);
+            setStoredWorldIdentity(restored);
+            setIdentityError(null);
+          }
+          return;
+        }
+        if (response.status !== 401) {
+          await readIdentityResponse(response);
+        }
+
+        const storedToken = getStoredAccessIdentity();
+        if (storedToken && (await restoreWorldWithToken(storedToken))) return;
+        clearStoredWorldIdentity();
+      } catch (error) {
+        if (!cancelled) {
+          setIdentityError(
+            error instanceof Error
+              ? error.message
+              : 'World identity could not be loaded. Check your connection and try again.'
+          );
+        }
+      } finally {
+        if (!cancelled) setIsLoading(false);
+      }
+    };
+
+    void loadIdentity();
+    return () => {
+      cancelled = true;
+    };
+  }, [restoreWorldWithToken]);
+
+  const identifyWorld = useCallback(
+    async (name: string): Promise<WorldIdentity> => {
+      const trimmedName = name.trim();
+      if (!trimmedName || trimmedName.length > 80) {
+        throw new Error('Choose a name between 1 and 80 characters.');
+      }
+      const accessIdentity = generateAccessIdentity();
+      const response = await fetch('/api/identity', {
+        method: 'POST',
+        credentials: 'same-origin',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'identify',
+          accessIdentity,
+          displayName: trimmedName,
+        }),
+      });
+      const newIdentity = await readIdentityResponse(response);
+
+      setStoredAccessIdentity(accessIdentity);
+      setStoredWorldIdentity(newIdentity);
+      setIdentity(newIdentity);
+      setIdentityError(null);
+      return newIdentity;
+    },
+    []
+  );
+
+  const resetIdentity = useCallback(async () => {
+    const response = await fetch('/api/identity', {
+      method: 'POST',
+      credentials: 'same-origin',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action: 'logout' }),
+    });
+    if (!response.ok) {
+      throw new Error('Your private-world session could not be closed.');
+    }
     clearStoredWorldIdentity();
     setIdentity(null);
   }, []);
@@ -159,11 +180,12 @@ export function WorldIdentityProvider({
       identity,
       isIdentified: Boolean(identity?.isIdentified && identity.displayName),
       isLoading,
+      identityError,
       identifyWorld,
       restoreWorldWithToken,
       resetIdentity,
     }),
-    [identity, isLoading, identifyWorld, restoreWorldWithToken, resetIdentity]
+    [identity, isLoading, identityError, identifyWorld, restoreWorldWithToken, resetIdentity]
   );
 
   return (

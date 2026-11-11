@@ -4,6 +4,7 @@ import path from 'path';
 export default defineConfig({
   test: {
     environment: 'happy-dom',
+    pool: 'forks',
     fileParallelism: false,
     isolate: false,
     testTimeout: 30000,

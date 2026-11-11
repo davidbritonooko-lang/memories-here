@@ -1,10 +1,11 @@
 import React from 'react';
+import type { Metadata } from 'next';
+import { MomentDetailView } from '@/features/moments';
 
-/**
- * Moment detail page stub — dynamic route.
- * Phase 3: Shell stub. Full Moment Engine built in Phase 10–12.
- * Params are a Promise per Next.js 16 App Router spec.
- */
+export const metadata: Metadata = {
+  title: 'Moment — Peshie Her World',
+};
+
 export default async function MomentDetailPage({
   params,
 }: {
@@ -12,14 +13,5 @@ export default async function MomentDetailPage({
 }) {
   const { id } = await params;
 
-  return (
-    <div className="flex flex-col items-center justify-center min-h-[60vh] p-6 text-center">
-      <p className="font-ui text-xs text-[#9A949B] dark:text-[#77717A] tracking-widest uppercase mb-2">
-        Moment
-      </p>
-      <h1 className="font-editorial text-3xl font-semibold text-[#171518] dark:text-[#F5F1F4]">
-        {id}
-      </h1>
-    </div>
-  );
+  return <MomentDetailView momentId={id} />;
 }

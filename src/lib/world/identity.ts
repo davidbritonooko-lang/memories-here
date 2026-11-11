@@ -6,7 +6,7 @@
 export interface WorldIdentity {
   worldId: string;
   displayName: string;
-  accessIdentity: string;
+  accessIdentity?: string;
   isIdentified: boolean;
   createdAt: string;
   lastAccessedAt: string;
@@ -22,13 +22,13 @@ export const STORAGE_KEYS = {
  * Format: 32-byte hex string (256 bits of entropy).
  */
 export function generateAccessIdentity(): string {
-  if (typeof crypto !== 'undefined' && crypto.getRandomValues) {
-    const array = new Uint8Array(32);
-    crypto.getRandomValues(array);
-    return Array.from(array, (byte) => byte.toString(16).padStart(2, '0')).join('');
+  if (typeof crypto === 'undefined' || !crypto.getRandomValues) {
+    throw new Error('Secure access keys require a cryptographically secure browser.');
   }
-  // Fallback for non-crypto environments (tests)
-  return 'peshie_' + Math.random().toString(36).substring(2) + Date.now().toString(36);
+
+  const array = new Uint8Array(32);
+  crypto.getRandomValues(array);
+  return Array.from(array, (byte) => byte.toString(16).padStart(2, '0')).join('');
 }
 
 /**
@@ -85,7 +85,8 @@ export function getStoredWorldIdentity(): WorldIdentity | null {
 export function setStoredWorldIdentity(identity: WorldIdentity): void {
   if (typeof window === 'undefined') return;
   try {
-    localStorage.setItem(STORAGE_KEYS.WORLD_IDENTITY, JSON.stringify(identity));
+    const safeIdentity = { ...identity, accessIdentity: undefined };
+    localStorage.setItem(STORAGE_KEYS.WORLD_IDENTITY, JSON.stringify(safeIdentity));
   } catch {
     // Ignore storage errors
   }

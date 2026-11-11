@@ -6,6 +6,7 @@ import {
   extractAccessIdentityFromUrl,
   getStoredWorldIdentity,
   setStoredWorldIdentity,
+  getStoredAccessIdentity,
   clearStoredWorldIdentity,
 } from '@/lib/world/identity';
 import {
@@ -15,9 +16,63 @@ import {
 import { PlayfulIdentityGate } from '@/features/identity/PlayfulIdentityGate';
 
 describe('Phase 4: World Identity Acceptance Tests', () => {
+  const serverIdentity = {
+    worldId: '23b3a87f-8ca1-4d7f-9afd-c194b6b993af',
+    displayName: 'Peshie',
+    isIdentified: true,
+    createdAt: new Date().toISOString(),
+    lastAccessedAt: new Date().toISOString(),
+  };
+
   beforeEach(() => {
     localStorage.clear();
     vi.restoreAllMocks();
+    vi.unstubAllGlobals();
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async (_input: RequestInfo | URL, init?: RequestInit) => {
+        if (!init?.method) {
+          return {
+            ok: false,
+            status: 401,
+            json: async () => ({ error: 'No active world session.' }),
+          } as Response;
+        }
+
+        const body = JSON.parse(String(init.body)) as {
+          action: string;
+          accessIdentity?: string;
+          displayName?: string;
+        };
+        if (body.action === 'logout') {
+          return { ok: true, status: 204, json: async () => ({}) } as Response;
+        }
+
+        if (body.action === 'restore' && body.accessIdentity === 'a'.repeat(64)) {
+          return {
+            ok: true,
+            status: 200,
+            json: async () => ({ identity: serverIdentity }),
+          } as Response;
+        }
+
+        if (body.action === 'identify') {
+          return {
+            ok: true,
+            status: 200,
+            json: async () => ({
+              identity: { ...serverIdentity, displayName: body.displayName },
+            }),
+          } as Response;
+        }
+
+        return {
+          ok: false,
+          status: 401,
+          json: async () => ({ error: 'That access key was not recognized.' }),
+        } as Response;
+      })
+    );
   });
 
   describe('Cryptographic Private World Access (Spec Section 12)', () => {
@@ -28,7 +83,7 @@ describe('Phase 4: World Identity Acceptance Tests', () => {
       expect(token1).toBeTruthy();
       expect(token2).toBeTruthy();
       expect(token1).not.toBe(token2);
-      expect(token1.length).toBeGreaterThanOrEqual(32);
+      expect(token1).toMatch(/^[a-f\d]{64}$/i);
     });
 
     it('extracts access identity from URL search parameters', () => {
@@ -37,11 +92,11 @@ describe('Phase 4: World Identity Acceptance Tests', () => {
       expect(extractAccessIdentityFromUrl('?other=123')).toBeNull();
     });
 
-    it('persists and restores world identity in local storage', () => {
+    it('persists display identity without persisting its access key', () => {
       const identity = {
-        worldId: 'world_123',
+        worldId: '23b3a87f-8ca1-4d7f-9afd-c194b6b993af',
         displayName: 'Peshie',
-        accessIdentity: 'unguessable_token_xyz',
+        accessIdentity: 'a'.repeat(64),
         isIdentified: true,
         createdAt: new Date().toISOString(),
         lastAccessedAt: new Date().toISOString(),
@@ -49,15 +104,20 @@ describe('Phase 4: World Identity Acceptance Tests', () => {
 
       setStoredWorldIdentity(identity);
       const retrieved = getStoredWorldIdentity();
-      expect(retrieved).toEqual(identity);
+      expect(retrieved?.worldId).toBe(identity.worldId);
+      expect(retrieved?.displayName).toBe(identity.displayName);
+      expect(retrieved?.accessIdentity).toBeUndefined();
+      expect(localStorage.getItem('peshie_world_identity')).not.toContain('accessIdentity');
 
+      localStorage.setItem('peshie_access_token', identity.accessIdentity);
       clearStoredWorldIdentity();
       expect(getStoredWorldIdentity()).toBeNull();
+      expect(getStoredAccessIdentity()).toBeNull();
     });
   });
 
   describe('Playful Identity Experience (Spec Section 11)', () => {
-    it('presents the playful question instead of conventional login', () => {
+    it('presents the playful question instead of conventional login', async () => {
       render(
         <WorldIdentityProvider>
           <PlayfulIdentityGate>
@@ -67,7 +127,7 @@ describe('Phase 4: World Identity Acceptance Tests', () => {
       );
 
       // Verify exact specification phrase: "who's the pretty girl around here?"
-      expect(screen.getByText(/who's the pretty girl/i)).toBeDefined();
+      expect(await screen.findByText(/who's the pretty girl/i)).toBeDefined();
 
       // Verify it does NOT contain email/password fields
       expect(screen.queryByLabelText(/email/i)).toBeNull();
@@ -86,7 +146,7 @@ describe('Phase 4: World Identity Acceptance Tests', () => {
         </WorldIdentityProvider>
       );
 
-      const input = screen.getByPlaceholderText(/your name.../i);
+      const input = await screen.findByPlaceholderText(/your name.../i);
       fireEvent.change(input, { target: { value: 'Peshie' } });
 
       const submitButton = screen.getByRole('button', { name: /it's me/i });
@@ -100,22 +160,24 @@ describe('Phase 4: World Identity Acceptance Tests', () => {
       const content = await screen.findByTestId('world-content', {}, { timeout: 3000 });
       expect(content).toBeDefined();
 
-      // Verify identity was stored in localStorage
+      // The recovery key is kept locally; the cached identity omits it.
       const stored = getStoredWorldIdentity();
       expect(stored).not.toBeNull();
       expect(stored?.displayName).toBe('Peshie');
       expect(stored?.isIdentified).toBe(true);
+      expect(stored?.accessIdentity).toBeUndefined();
+      expect(getStoredAccessIdentity()).toMatch(/^[a-f\d]{64}$/i);
     });
 
-    it('immediately unlocks world when valid identity is already stored (returning visit)', () => {
-      setStoredWorldIdentity({
-        worldId: 'world_returning',
-        displayName: 'Peshie',
-        accessIdentity: 'token_returning',
-        isIdentified: true,
-        createdAt: new Date().toISOString(),
-        lastAccessedAt: new Date().toISOString(),
-      });
+    it('unlocks only after the server validates the existing session', async () => {
+      vi.stubGlobal(
+        'fetch',
+        vi.fn(async () => ({
+          ok: true,
+          status: 200,
+          json: async () => ({ identity: serverIdentity }),
+        })) as unknown as typeof fetch
+      );
 
       render(
         <WorldIdentityProvider>
@@ -125,7 +187,7 @@ describe('Phase 4: World Identity Acceptance Tests', () => {
         </WorldIdentityProvider>
       );
 
-      expect(screen.getByTestId('world-content')).toBeDefined();
+      expect(await screen.findByTestId('world-content')).toBeDefined();
       expect(screen.queryByText(/who's the pretty girl/i)).toBeNull();
     });
   });
@@ -139,12 +201,13 @@ describe('Phase 4: World Identity Acceptance Tests', () => {
       const { result } = renderHook(() => useWorldIdentity(), { wrapper });
 
       await act(async () => {
-        const success = await result.current.restoreWorldWithToken('token_new_phone_123');
+        const success = await result.current.restoreWorldWithToken('a'.repeat(64));
         expect(success).toBe(true);
       });
 
       expect(result.current.isIdentified).toBe(true);
-      expect(result.current.identity?.accessIdentity).toBe('token_new_phone_123');
+      expect(result.current.identity?.worldId).toBe(serverIdentity.worldId);
+      expect(getStoredAccessIdentity()).toBe('a'.repeat(64));
     });
   });
 });

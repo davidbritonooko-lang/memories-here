@@ -4,6 +4,9 @@ import './globals.css';
 import { ThemeProvider } from '@/features/settings/ThemeProvider';
 import { ToastProvider } from '@/components/ui/toast';
 import { WorldIdentityProvider } from '@/features/identity';
+import { MusicProvider } from '@/engines/music';
+import { InstallationProvider } from '@/engines/installation';
+import { OfflineProvider } from '@/engines/offline';
 
 const inter = Inter({
   variable: '--font-inter',
@@ -60,7 +63,13 @@ export default function RootLayout({
       <body className="min-h-full flex flex-col font-ui">
         <ThemeProvider>
           <ToastProvider>
-            <WorldIdentityProvider>{children}</WorldIdentityProvider>
+            <WorldIdentityProvider>
+              <MusicProvider>
+                <InstallationProvider>
+                  <OfflineProvider>{children}</OfflineProvider>
+                </InstallationProvider>
+              </MusicProvider>
+            </WorldIdentityProvider>
           </ToastProvider>
         </ThemeProvider>
       </body>

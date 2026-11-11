@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Sparkles, Heart } from 'lucide-react';
 import { useWorldIdentity } from './WorldIdentityProvider';
@@ -12,10 +12,18 @@ export interface PlayfulIdentityGateProps {
 }
 
 export function PlayfulIdentityGate({ children }: PlayfulIdentityGateProps) {
-  const { isIdentified, isLoading, identifyWorld } = useWorldIdentity();
+  const { isIdentified, isLoading, identityError, identifyWorld } = useWorldIdentity();
   const [name, setName] = useState('');
   const [step, setStep] = useState<'prompt' | 'remembering'>('prompt');
   const [error, setError] = useState<string | null>(null);
+  const submitTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(
+    () => () => {
+      if (submitTimer.current) clearTimeout(submitTimer.current);
+    },
+    []
+  );
 
   if (isLoading) {
     return (
@@ -27,6 +35,19 @@ export function PlayfulIdentityGate({ children }: PlayfulIdentityGateProps) {
 
   if (isIdentified) {
     return <>{children}</>;
+  }
+
+  if (identityError) {
+    return (
+      <div className="fixed inset-0 z-50 flex flex-col items-center justify-center gap-4 p-6 bg-[#F7F5F2] text-center dark:bg-[#0C0B0F]">
+        <p role="alert" className="max-w-sm text-sm text-secondary-text">
+          {identityError}
+        </p>
+        <Button type="button" onClick={() => window.location.reload()}>
+          Try again
+        </Button>
+      </div>
+    );
   }
 
   const handleSubmit = (e?: React.FormEvent | React.MouseEvent) => {
@@ -42,8 +63,15 @@ export function PlayfulIdentityGate({ children }: PlayfulIdentityGateProps) {
 
     // Display "I'll remember you forever." for an emotional beat before entering
     const delay = process.env.NODE_ENV === 'test' ? 1200 : 1800;
-    setTimeout(async () => {
-      await identifyWorld(trimmed);
+    submitTimer.current = setTimeout(() => {
+      void identifyWorld(trimmed).catch((cause: unknown) => {
+        setStep('prompt');
+        setError(
+          cause instanceof Error
+            ? cause.message
+            : 'Could not create your private world. Please try again.'
+        );
+      });
     }, delay);
   };
 
@@ -97,7 +125,7 @@ export function PlayfulIdentityGate({ children }: PlayfulIdentityGateProps) {
                   type="submit"
                   size="md"
                   className="w-full mt-2"
-                  onClick={handleSubmit}
+                  disabled={step !== 'prompt'}
                 >
                   It&apos;s me
                 </Button>
