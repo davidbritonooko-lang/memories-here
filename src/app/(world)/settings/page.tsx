@@ -229,7 +229,7 @@ export default function SettingsPage() {
                 <HardDrive className="w-5 h-5" />
               </div>
               <div>
-                <h2 className="text-base font-semibold text-primary-text">Offline Storage</h2>
+                <h2 className="text-base font-semibold text-primary-text">Browser Storage</h2>
                 <p className="text-xs text-secondary-text">Browser storage currently used by the app. Media downloads for offline use are not available yet.</p>
               </div>
             </div>
