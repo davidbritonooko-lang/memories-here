@@ -13,7 +13,14 @@ CREATE TABLE IF NOT EXISTS public.storage_cleanup_jobs (
 
 ALTER TABLE public.storage_cleanup_jobs ENABLE ROW LEVEL SECURITY;
 REVOKE ALL ON TABLE public.storage_cleanup_jobs FROM anon, authenticated;
+GRANT INSERT ON TABLE public.storage_cleanup_jobs TO authenticated;
 GRANT ALL ON TABLE public.storage_cleanup_jobs TO service_role;
+
+CREATE POLICY "Authenticated worlds can enqueue their own media cleanup"
+ON public.storage_cleanup_jobs
+FOR INSERT
+TO authenticated
+WITH CHECK ((SELECT auth.uid()) = world_id);
 
 CREATE OR REPLACE FUNCTION public.purge_archived_world_entity(
   p_archive_item_id UUID,
@@ -22,7 +29,6 @@ CREATE OR REPLACE FUNCTION public.purge_archived_world_entity(
 )
 RETURNS UUID
 LANGUAGE plpgsql
-SECURITY DEFINER
 SET search_path = public, pg_temp
 AS $$
 DECLARE

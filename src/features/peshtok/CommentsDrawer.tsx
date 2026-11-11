@@ -121,7 +121,7 @@ export function CommentsDrawer({
         is_simulated: true,
       });
 
-      setComments((prev) => [...prev, created as unknown as Comment]);
+      appendComment(created as unknown as Comment);
     } catch {
       showToast("Couldn't add the sample comment.", 'error');
     }
