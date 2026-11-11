@@ -98,7 +98,7 @@ export default function ArchivePage() {
       await archiveRepo.permanentlyDelete(item.id, item.entity_type, item.entity_id);
 
       // Purged media must not remain available from this device's offline cache.
-      await clearCache();
+      const localCacheCleared = await clearCache();
       await refreshEstimate();
 
       let cleanupPending = true;
@@ -117,10 +117,10 @@ export default function ArchivePage() {
 
       setItems((prev) => prev.filter((i) => i.id !== item.id));
       showToast(
-        cleanupPending
-          ? 'Record removed. Server media cleanup is queued and will retry; this device’s offline media cache was cleared.'
+        cleanupPending || !localCacheCleared
+          ? 'Record removed. Server media cleanup or local cache cleanup could not be confirmed; pending cleanup will retry.'
           : `Permanently deleted ${item.entity_type}, its stored media, and this device’s offline cache.`,
-        cleanupPending ? 'error' : 'info'
+        cleanupPending || !localCacheCleared ? 'error' : 'info'
       );
     } catch {
       showToast(`Couldn't delete this ${item.entity_type}.`, 'error');
