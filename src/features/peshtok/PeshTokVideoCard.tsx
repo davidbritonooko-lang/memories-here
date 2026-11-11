@@ -187,10 +187,10 @@ export function PeshTokVideoCard({
       <div className="absolute bottom-4 left-4 right-16 flex flex-col gap-1.5 z-20 text-white drop-shadow-md">
         <div className="flex items-center gap-2">
           <div className="w-7 h-7 rounded-full bg-accent flex items-center justify-center text-xs font-bold text-white shadow-sm">
-            {currentUserName ? currentUserName.charAt(0).toUpperCase() : 'P'}
+            {currentUserName ? currentUserName.charAt(0).toUpperCase()  : 'U'}
           </div>
           <span className="text-sm font-semibold tracking-wide">
-            @{currentUserName || 'peshie'}
+            @{currentUserName || 'user'}
           </span>
         </div>
 

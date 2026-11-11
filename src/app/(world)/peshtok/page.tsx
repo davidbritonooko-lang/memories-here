@@ -29,12 +29,16 @@ export default function PeshTokPage() {
 
   const containerRef = useRef<HTMLDivElement>(null);
 
-  const worldId =
-    identity?.worldId ||
-    (identity?.displayName ? `world-${identity.displayName.toLowerCase()}` : 'default-world');
-  const currentUserName = identity?.displayName || 'Peshie';
+  const worldId = identity?.worldId ?? '';
+  const currentUserName = identity?.displayName ?? '';
 
   const loadFeed = useCallback(async () => {
+    if (!worldId) {
+      setFeed([]);
+      setIsLoading(false);
+      return;
+    }
+
     setIsLoading(true);
     try {
       const data = await peshtokRepo.listFeed(worldId);
@@ -100,10 +104,10 @@ export default function PeshTokPage() {
           <h1 className="font-peshtok text-2xl sm:text-3xl font-bold text-primary-text tracking-tight">
             PeshTok
           </h1>
-          <p className="text-xs text-secondary-text">Her world in motion, alive and playful.</p>
+          <p className="text-xs text-secondary-text">Short-form videos from your private archive.</p>
         </div>
 
-        <Button size="sm" onClick={() => setIsUploadOpen(true)}>
+        <Button size="sm" onClick={() => setIsUploadOpen(true)} disabled={!worldId}>
           <Plus className="w-4 h-4 mr-1.5" />
           Post Clip
         </Button>
@@ -113,14 +117,14 @@ export default function PeshTokPage() {
       {isLoading ? (
         <div className="flex flex-col items-center justify-center flex-1 text-center">
           <Spinner size="lg" />
-          <p className="mt-3 text-xs text-muted-text">Tuning in to her stream...</p>
+          <p className="mt-3 text-xs text-muted-text">Loading video moments...</p>
         </div>
       ) : feed.length === 0 ? (
         <div className="flex flex-col items-center justify-center flex-1">
           <EmptyState
             icon={<Sparkles className="w-6 h-6" />}
             title="No clips on PeshTok yet"
-            description="Share short vertical videos to capture her smiles, dance moves, and sweet moments."
+            description="Share short vertical videos from your archive."
             action={
               <Button size="sm" onClick={() => setIsUploadOpen(true)}>
                 <Plus className="w-4 h-4 mr-1.5" />
@@ -151,7 +155,7 @@ export default function PeshTokPage() {
 
       {/* Upload Modal */}
       <UploadPeshTokModal
-        isOpen={isUploadOpen}
+        isOpen={isUploadOpen && Boolean(worldId)}
         onClose={() => setIsUploadOpen(false)}
         worldId={worldId}
         onPublished={() => {
