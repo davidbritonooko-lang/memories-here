@@ -17,32 +17,35 @@ import { getHeroThumbnail, formatMomentDate } from '@/features/moments/utils';
 import { formatTrackTitle } from '@/features/soundtrack/utils';
 import { APP_NAME } from '@/types/constants';
 
+interface HomeSnapshot {
+  worldId: string | null;
+  latestMoment: MomentWithMedia | null;
+  featuredTrack: Track | null;
+  latestHeroUrl: string | null;
+  counts: { moments: number; tracks: number; peshtok: number };
+}
+
+const EMPTY_HOME_SNAPSHOT: HomeSnapshot = {
+  worldId: null,
+  latestMoment: null,
+  featuredTrack: null,
+  latestHeroUrl: null,
+  counts: { moments: 0, tracks: 0, peshtok: 0 },
+};
+
 export default function HomePage() {
   const { identity } = useWorldIdentity();
   const { engine, state: musicState } = useMusic();
   const { showToast } = useToast();
 
   const greeting = getAmbientGreeting(identity?.displayName);
-  const [latestMoment, setLatestMoment] = useState<MomentWithMedia | null>(null);
-  const [featuredTrack, setFeaturedTrack] = useState<Track | null>(null);
-  const [latestHeroUrl, setLatestHeroUrl] = useState<string | null>(null);
-  const [counts, setCounts] = useState({ moments: 0, tracks: 0, peshtok: 0 });
-
+  const [snapshot, setSnapshot] = useState<HomeSnapshot>(EMPTY_HOME_SNAPSHOT);
   const worldId = identity?.worldId ?? null;
 
   useEffect(() => {
+    if (!worldId) return;
+
     let cancelled = false;
-
-    setLatestMoment(null);
-    setFeaturedTrack(null);
-    setLatestHeroUrl(null);
-    setCounts({ moments: 0, tracks: 0, peshtok: 0 });
-
-    if (!worldId) {
-      return () => {
-        cancelled = true;
-      };
-    }
 
     const loadHomeData = async () => {
       try {
@@ -52,32 +55,34 @@ export default function HomePage() {
           peshtokRepo.listFeed(worldId),
         ]);
 
-        if (cancelled) return;
-
         const momentsList = (momentsData || []) as unknown as MomentWithMedia[];
         const tracksList = (tracksData || []) as unknown as Track[];
         const feedList = feedData || [];
 
-        setCounts({
-          moments: momentsList.length,
-          tracks: tracksList.length,
-          peshtok: feedList.length,
-        });
-
-        if (momentsList.length > 0) {
-          const first = momentsList[0];
-          setLatestMoment(first);
-          const heroPath = getHeroThumbnail(first);
+        let heroUrl: string | null = null;
+        const firstMoment = momentsList[0];
+        if (firstMoment) {
+          const heroPath = getHeroThumbnail(firstMoment);
           if (heroPath && !heroPath.startsWith('http') && !heroPath.startsWith('blob:')) {
             const bucket = heroPath.includes('/videos/') ? 'thumbnails' : 'photos';
-            const res = await getSignedUrl(bucket, heroPath);
-            if (!cancelled && res.url) setLatestHeroUrl(res.url);
+            const result = await getSignedUrl(bucket, heroPath);
+            heroUrl = result.url;
           }
         }
 
-        if (!cancelled && tracksList.length > 0) {
-          setFeaturedTrack(tracksList[0]);
-        }
+        if (cancelled) return;
+
+        setSnapshot({
+          worldId,
+          latestMoment: firstMoment ?? null,
+          featuredTrack: tracksList[0] ?? null,
+          latestHeroUrl: heroUrl,
+          counts: {
+            moments: momentsList.length,
+            tracks: tracksList.length,
+            peshtok: feedList.length,
+          },
+        });
       } catch {
         if (!cancelled) showToast("Couldn't load your private archive.", 'error');
       }
@@ -88,6 +93,9 @@ export default function HomePage() {
       cancelled = true;
     };
   }, [worldId, showToast]);
+
+  const activeSnapshot = snapshot.worldId === worldId ? snapshot : EMPTY_HOME_SNAPSHOT;
+  const { latestMoment, featuredTrack, latestHeroUrl, counts } = activeSnapshot;
 
   const handlePlayFeaturedTrack = async () => {
     if (!featuredTrack) return;

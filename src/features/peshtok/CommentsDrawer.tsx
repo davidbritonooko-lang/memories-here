@@ -28,8 +28,11 @@ export function CommentsDrawer({
   currentUserName,
 }: CommentsDrawerProps) {
   const { showToast } = useToast();
-  const [comments, setComments] = useState<Comment[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
+  const [commentsState, setCommentsState] = useState<{
+    videoId: string;
+    comments: Comment[];
+    status: 'loading' | 'loaded';
+  }>({ videoId: '', comments: [], status: 'loading' });
   const [newCommentText, setNewCommentText] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
 
@@ -37,20 +40,22 @@ export function CommentsDrawer({
     if (!isOpen) return;
 
     let cancelled = false;
-    setIsLoading(true);
-    setComments([]);
 
     const loadComments = async () => {
       try {
         const data = await peshtokRepo.listComments(videoId);
-        if (!cancelled) setComments((data || []) as unknown as Comment[]);
+        if (!cancelled) {
+          setCommentsState({
+            videoId,
+            comments: (data || []) as unknown as Comment[],
+            status: 'loaded',
+          });
+        }
       } catch {
         if (!cancelled) {
-          setComments([]);
+          setCommentsState({ videoId, comments: [], status: 'loaded' });
           showToast("Couldn't load comments.", 'error');
         }
-      } finally {
-        if (!cancelled) setIsLoading(false);
       }
     };
 
@@ -59,6 +64,19 @@ export function CommentsDrawer({
       cancelled = true;
     };
   }, [isOpen, videoId, showToast]);
+
+  const comments = commentsState.videoId === videoId ? commentsState.comments : [];
+  const isLoading = commentsState.videoId !== videoId || commentsState.status === 'loading';
+
+  const appendComment = (comment: Comment) => {
+    setCommentsState((previous) => ({
+      videoId,
+      comments: previous.videoId === videoId
+        ? [...previous.comments, comment]
+        : [comment],
+      status: 'loaded',
+    }));
+  };
 
   const handleAddComment = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -78,7 +96,7 @@ export function CommentsDrawer({
         is_simulated: false,
       });
 
-      setComments((prev) => [...prev, created as unknown as Comment]);
+      appendComment(created as unknown as Comment);
       setNewCommentText('');
     } catch {
       showToast("Couldn't add your comment.", 'error');
