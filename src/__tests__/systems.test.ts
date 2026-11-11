@@ -4,7 +4,7 @@
  * Specification Sections: 6, 7, 29, 30, 31, 32, 48
  */
 
-import { describe, it, expect, beforeEach } from 'vitest';
+import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { InstallationEngine } from '@/engines/installation/engine';
 import { OfflineEngine } from '@/engines/offline/engine';
 import { getAmbientGreeting } from '@/features/home/greeting';
@@ -67,9 +67,28 @@ describe('Phase 17 to 21 Acceptance Tests', () => {
       expect(estimate.quotaBytes).toBeGreaterThanOrEqual(0);
     });
 
-    it('clearCache executes without throwing', async () => {
-      const ok = await engine.clearCache();
-      expect(typeof ok).toBe('boolean');
+    it('clearCache removes only caches owned by this app', async () => {
+      const cacheApi = {
+        keys: vi.fn().mockResolvedValue(['other-app-cache', 'peshie-media-v1']),
+        delete: vi.fn().mockImplementation(async (key: string) => key === 'peshie-media-v1'),
+      };
+      Object.defineProperty(window, 'caches', {
+        configurable: true,
+        value: cacheApi,
+      });
+      vi.stubGlobal('caches', cacheApi);
+
+      try {
+        const ok = await engine.clearCache();
+
+        expect(ok).toBe(true);
+        expect(cacheApi.delete).toHaveBeenCalledTimes(1);
+        expect(cacheApi.delete).toHaveBeenCalledWith('peshie-media-v1');
+        expect(cacheApi.delete).not.toHaveBeenCalledWith('other-app-cache');
+      } finally {
+        delete (window as Window & { caches?: CacheStorage }).caches;
+        vi.unstubAllGlobals();
+      }
     });
   });
 

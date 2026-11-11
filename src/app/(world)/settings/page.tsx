@@ -52,7 +52,7 @@ export default function SettingsPage() {
         theme,
         music_volume: musicState.volume,
         offline_preferences: {
-          auto_cache_moments: true,
+          auto_cache_moments: false,
           max_storage_mb: 1024,
         },
       });
