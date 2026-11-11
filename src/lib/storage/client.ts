@@ -142,14 +142,18 @@ export async function getSignedUrl(
   storagePath: string,
   expiresInSeconds = 3600,
 ): Promise<{ url: string | null; error: StorageError | null }> {
-  const supabase = getSupabaseBrowserClient();
+  const worldId = storagePath.split('/')[0];
 
-  const { data, error } = await supabase.storage
-    .from(bucket)
-    .createSignedUrl(storagePath, expiresInSeconds);
+  try {
+    const supabase = getSupabaseBrowserClient();
+    const { data, error } = await supabase.storage
+      .from(bucket)
+      .createSignedUrl(storagePath, expiresInSeconds);
 
-  if (error || !data?.signedUrl) {
-    const worldId = storagePath.split('/')[0];
+    if (!error && data?.signedUrl) {
+      return { url: data.signedUrl, error: null };
+    }
+
     const cachedUrl = await getCachedMediaUrl(
       worldId,
       bucket as OfflineMediaBucket,
@@ -164,11 +168,23 @@ export async function getSignedUrl(
         userMessage: "Couldn't load this file right now. Try again.",
       },
     };
+  } catch (cause) {
+    const cachedUrl = await getCachedMediaUrl(
+      worldId,
+      bucket as OfflineMediaBucket,
+      storagePath
+    );
+    if (cachedUrl) return { url: cachedUrl, error: null };
+
+    return {
+      url: null,
+      error: {
+        message: cause instanceof Error ? cause.message : 'Storage request failed.',
+        userMessage: "Couldn't load this file right now. Try again.",
+      },
+    };
   }
-
-  return { url: data.signedUrl, error: null };
 }
-
 /**
  * Creates signed URLs for multiple storage paths in a single request.
  */
