@@ -4,9 +4,9 @@
  * Specification Sections: 6, 7, 29, 30, 31, 32, 48
  */
 
-import { describe, it, expect, beforeEach } from 'vitest';
+import { afterEach, describe, it, expect, beforeEach, vi } from 'vitest';
 import { InstallationEngine } from '@/engines/installation/engine';
-import { OfflineEngine } from '@/engines/offline/engine';
+import { OfflineEngine, buildOfflineMediaCacheUrl, isWorldScopedMediaPath } from '@/engines/offline/engine';
 import { getAmbientGreeting } from '@/features/home/greeting';
 import { worldRepo } from '@/lib/supabase/db';
 
@@ -19,6 +19,10 @@ describe('Phase 17 to 21 Acceptance Tests', () => {
 
     beforeEach(() => {
       engine = new InstallationEngine();
+    });
+
+    afterEach(() => {
+      engine.destroy();
     });
 
     it('initializes with platform detection and install state', () => {
@@ -42,6 +46,24 @@ describe('Phase 17 to 21 Acceptance Tests', () => {
       const result = await engine.promptInstall();
       expect(result).toBe(false);
     });
+
+    it('consumes a dismissed install prompt and does not reuse it', async () => {
+      const prompt = vi.fn().mockResolvedValue(undefined);
+      const event = new Event('beforeinstallprompt', { cancelable: true }) as Event & {
+        prompt: () => Promise<void>;
+        userChoice: Promise<{ outcome: 'accepted' | 'dismissed' }>;
+      };
+      event.prompt = prompt;
+      event.userChoice = Promise.resolve({ outcome: 'dismissed' });
+      window.dispatchEvent(event);
+
+      expect(engine.getState().isInstallable).toBe(true);
+      await expect(engine.promptInstall()).resolves.toBe(false);
+      expect(prompt).toHaveBeenCalledTimes(1);
+      expect(engine.getState().isInstallable).toBe(false);
+      await expect(engine.promptInstall()).resolves.toBe(false);
+      expect(prompt).toHaveBeenCalledTimes(1);
+    });
   });
 
   // ---------------------------------------------------------------------------
@@ -52,6 +74,31 @@ describe('Phase 17 to 21 Acceptance Tests', () => {
 
     beforeEach(() => {
       engine = new OfflineEngine();
+    });
+
+    afterEach(() => {
+      engine.destroy();
+    });
+
+    it('accepts only media paths scoped to the requested world and bucket', () => {
+      expect(isWorldScopedMediaPath('world-1', 'photos', 'world-1/photos/image.jpg')).toBe(true);
+      expect(isWorldScopedMediaPath('world-1', 'photos', 'world-2/photos/image.jpg')).toBe(false);
+      expect(isWorldScopedMediaPath('world-1', 'photos', 'world-1/videos/clip.mp4')).toBe(false);
+      expect(isWorldScopedMediaPath('world-1', 'photos', 'world-1/photos/../other/file.jpg')).toBe(false);
+    });
+
+    it('builds a same-origin cache key without losing path identity', () => {
+      const key = new URL(buildOfflineMediaCacheUrl(
+        'https://peshie.example',
+        'world-1',
+        'photos',
+        'world-1/photos/a photo.jpg'
+      ));
+      expect(key.origin).toBe('https://peshie.example');
+      expect(key.pathname).toBe('/__peshie_media_cache__');
+      expect(key.searchParams.get('world')).toBe('world-1');
+      expect(key.searchParams.get('bucket')).toBe('photos');
+      expect(key.searchParams.get('path')).toBe('world-1/photos/a photo.jpg');
     });
 
     it('tracks online status and storage estimates', () => {
@@ -67,9 +114,28 @@ describe('Phase 17 to 21 Acceptance Tests', () => {
       expect(estimate.quotaBytes).toBeGreaterThanOrEqual(0);
     });
 
-    it('clearCache executes without throwing', async () => {
-      const ok = await engine.clearCache();
-      expect(typeof ok).toBe('boolean');
+    it('clearCache removes only caches owned by this app', async () => {
+      const cacheApi = {
+        keys: vi.fn().mockResolvedValue(['other-app-cache', 'peshie-media-v1']),
+        delete: vi.fn().mockImplementation(async (key: string) => key === 'peshie-media-v1'),
+      };
+      Object.defineProperty(window, 'caches', {
+        configurable: true,
+        value: cacheApi,
+      });
+      vi.stubGlobal('caches', cacheApi);
+
+      try {
+        const ok = await engine.clearCache();
+
+        expect(ok).toBe(true);
+        expect(cacheApi.delete).toHaveBeenCalledTimes(1);
+        expect(cacheApi.delete).toHaveBeenCalledWith('peshie-media-v1');
+        expect(cacheApi.delete).not.toHaveBeenCalledWith('other-app-cache');
+      } finally {
+        Reflect.deleteProperty(window, 'caches');
+        vi.unstubAllGlobals();
+      }
     });
   });
 
@@ -87,16 +153,16 @@ describe('Phase 17 to 21 Acceptance Tests', () => {
   // ---------------------------------------------------------------------------
   describe('Phase 21: Home Ambient Experience (Spec Section 1)', () => {
     it('getAmbientGreeting produces personalized greetings with title and subtitle', () => {
-      const greeting = getAmbientGreeting('Peshie');
+      const greeting = getAmbientGreeting('Taylor');
       expect(typeof greeting.title).toBe('string');
-      expect(greeting.title).toContain('Peshie');
+      expect(greeting.title).toContain('Taylor');
       expect(typeof greeting.subtitle).toBe('string');
       expect(greeting.subtitle.length).toBeGreaterThan(10);
     });
 
     it('getAmbientGreeting falls back to default name when omitted', () => {
       const greeting = getAmbientGreeting();
-      expect(greeting.title).toContain('Peshie');
+      expect(greeting.title).toContain('there');
     });
   });
 });

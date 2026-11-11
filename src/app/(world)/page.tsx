@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
-import { Camera, Film, Music, Archive, Sparkles, Play, Pause, ArrowRight, Heart } from 'lucide-react';
+import { Camera, Film, Music, Archive, Sparkles, Play, Pause, ArrowRight } from 'lucide-react';
 import { useWorldIdentity } from '@/features/identity';
 import { useMusic } from '@/engines/music';
 import { momentsRepo, soundtrackRepo, peshtokRepo } from '@/lib/supabase/db';
@@ -10,63 +10,92 @@ import { getSignedUrl } from '@/lib/storage/client';
 import { getAmbientGreeting } from '@/features/home';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
+import { useToast } from '@/components/ui/toast';
 import type { Track } from '@/types';
 import type { MomentWithMedia } from '@/features/moments/utils';
 import { getHeroThumbnail, formatMomentDate } from '@/features/moments/utils';
 import { formatTrackTitle } from '@/features/soundtrack/utils';
+import { APP_NAME } from '@/types/constants';
+
+interface HomeSnapshot {
+  worldId: string | null;
+  latestMoment: MomentWithMedia | null;
+  featuredTrack: Track | null;
+  latestHeroUrl: string | null;
+  counts: { moments: number; tracks: number; peshtok: number };
+}
+
+const EMPTY_HOME_SNAPSHOT: HomeSnapshot = {
+  worldId: null,
+  latestMoment: null,
+  featuredTrack: null,
+  latestHeroUrl: null,
+  counts: { moments: 0, tracks: 0, peshtok: 0 },
+};
 
 export default function HomePage() {
   const { identity } = useWorldIdentity();
   const { engine, state: musicState } = useMusic();
+  const { showToast } = useToast();
 
   const greeting = getAmbientGreeting(identity?.displayName);
-  const [latestMoment, setLatestMoment] = useState<MomentWithMedia | null>(null);
-  const [featuredTrack, setFeaturedTrack] = useState<Track | null>(null);
-  const [latestHeroUrl, setLatestHeroUrl] = useState<string | null>(null);
-  const [counts, setCounts] = useState({ moments: 0, tracks: 0, peshtok: 0 });
-
-  const worldId =
-    identity?.worldId ||
-    (identity?.displayName ? `world-${identity.displayName.toLowerCase()}` : 'default-world');
+  const [snapshot, setSnapshot] = useState<HomeSnapshot>(EMPTY_HOME_SNAPSHOT);
+  const worldId = identity?.worldId ?? null;
 
   useEffect(() => {
-    void (async () => {
+    if (!worldId) return;
+
+    let cancelled = false;
+
+    const loadHomeData = async () => {
       try {
         const [momentsData, tracksData, feedData] = await Promise.all([
-          momentsRepo.listByWorld(worldId).catch(() => []),
-          soundtrackRepo.listTracks(worldId).catch(() => []),
-          peshtokRepo.listFeed(worldId).catch(() => []),
+          momentsRepo.listByWorld(worldId),
+          soundtrackRepo.listTracks(worldId),
+          peshtokRepo.listFeed(worldId),
         ]);
 
         const momentsList = (momentsData || []) as unknown as MomentWithMedia[];
         const tracksList = (tracksData || []) as unknown as Track[];
-        const feedList = (feedData || []) as unknown as unknown[];
+        const feedList = feedData || [];
 
-        setCounts({
-          moments: momentsList.length,
-          tracks: tracksList.length,
-          peshtok: feedList.length,
-        });
-
-        if (momentsList.length > 0) {
-          const first = momentsList[0];
-          setLatestMoment(first);
-          const heroPath = getHeroThumbnail(first);
+        let heroUrl: string | null = null;
+        const firstMoment = momentsList[0];
+        if (firstMoment) {
+          const heroPath = getHeroThumbnail(firstMoment);
           if (heroPath && !heroPath.startsWith('http') && !heroPath.startsWith('blob:')) {
             const bucket = heroPath.includes('/videos/') ? 'thumbnails' : 'photos';
-            const res = await getSignedUrl(bucket, heroPath);
-            if (res.url) setLatestHeroUrl(res.url);
+            const result = await getSignedUrl(bucket, heroPath);
+            heroUrl = result.url;
           }
         }
 
-        if (tracksList.length > 0) {
-          setFeaturedTrack(tracksList[0]);
-        }
+        if (cancelled) return;
+
+        setSnapshot({
+          worldId,
+          latestMoment: firstMoment ?? null,
+          featuredTrack: tracksList[0] ?? null,
+          latestHeroUrl: heroUrl,
+          counts: {
+            moments: momentsList.length,
+            tracks: tracksList.length,
+            peshtok: feedList.length,
+          },
+        });
       } catch {
-        // Fallback gracefully
+        if (!cancelled) showToast("Couldn't load your private archive.", 'error');
       }
-    })();
-  }, [worldId]);
+    };
+
+    void loadHomeData();
+    return () => {
+      cancelled = true;
+    };
+  }, [worldId, showToast]);
+
+  const activeSnapshot = snapshot.worldId === worldId ? snapshot : EMPTY_HOME_SNAPSHOT;
+  const { latestMoment, featuredTrack, latestHeroUrl, counts } = activeSnapshot;
 
   const handlePlayFeaturedTrack = async () => {
     if (!featuredTrack) return;
@@ -89,7 +118,7 @@ export default function HomePage() {
       <div className="flex flex-col gap-3 pt-6">
         <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-accent/10 text-accent text-xs font-semibold w-fit">
           <Sparkles className="w-3.5 h-3.5" />
-          <span>Her Private Sanctuary</span>
+          <span>Private Archive</span>
         </div>
 
         <h1 className="font-editorial text-4xl sm:text-5xl md:text-6xl font-semibold text-primary-text tracking-tight leading-tight">
@@ -206,7 +235,7 @@ export default function HomePage() {
       {/* Primary Portals Navigation Grid */}
       <div className="flex flex-col gap-3">
         <span className="text-xs font-semibold uppercase tracking-wider text-muted-text">
-          Explore Her World
+          Explore {APP_NAME}
         </span>
 
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
@@ -244,7 +273,7 @@ export default function HomePage() {
               <div className="mt-6">
                 <h3 className="font-editorial text-lg font-semibold text-primary-text">PeshTok</h3>
                 <p className="mt-1 text-xs text-secondary-text leading-relaxed">
-                  Her world in motion, alive and playful.
+                  Short-form video moments from your archive.
                 </p>
               </div>
             </Card>
@@ -264,7 +293,7 @@ export default function HomePage() {
               <div className="mt-6">
                 <h3 className="font-editorial text-lg font-semibold text-primary-text">Soundtrack</h3>
                 <p className="mt-1 text-xs text-secondary-text leading-relaxed">
-                  Atmospheric music that lives inside her world.
+                  A soundtrack for your private archive.
                 </p>
               </div>
             </Card>
@@ -290,11 +319,10 @@ export default function HomePage() {
         </div>
       </div>
 
-      {/* Heartfelt Footer Note */}
+      {/* Product footer note */}
       <div className="flex flex-col items-center justify-center text-center pt-8 border-t border-border/60">
-        <Heart className="w-5 h-5 text-accent/60 mb-2 fill-accent/20 animate-pulse" />
-        <p className="font-editorial text-sm text-secondary-text italic">
-          &ldquo;A little corner of the internet created with love for the one who makes the world brighter.&rdquo;
+        <p className="font-editorial text-sm text-secondary-text">
+          A private place to keep the moments, media, and music that matter.
         </p>
       </div>
     </div>

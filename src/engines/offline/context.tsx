@@ -1,12 +1,15 @@
 'use client';
 
 import React, { createContext, useContext, useEffect, useState, useMemo } from 'react';
-import { getOfflineEngine, type OfflineStorageState } from './engine';
+import { getOfflineEngine, type OfflineMediaAsset, type OfflineStorageState } from './engine';
 
 export interface OfflineContextValue extends OfflineStorageState {
   usedMB: number;
   quotaMB: number;
   clearCache: () => Promise<boolean>;
+  cacheMediaAsset: (asset: OfflineMediaAsset) => Promise<{ success: boolean; bytes: number }>;
+  isMediaCached: (asset: Pick<OfflineMediaAsset, 'worldId' | 'bucket' | 'storagePath'>) => Promise<boolean>;
+  getCachedMediaUsage: (worldId: string) => Promise<{ files: number; bytes: number }>;
   refreshEstimate: () => Promise<void>;
 }
 
@@ -26,6 +29,9 @@ export function OfflineProvider({ children }: { children: React.ReactNode }) {
       usedMB: Number((state.usedBytes / (1024 * 1024)).toFixed(1)),
       quotaMB: Number((state.quotaBytes / (1024 * 1024)).toFixed(0)),
       clearCache: () => engine.clearCache(),
+      cacheMediaAsset: (asset: OfflineMediaAsset) => engine.cacheMediaAsset(asset),
+      isMediaCached: (asset: Pick<OfflineMediaAsset, 'worldId' | 'bucket' | 'storagePath'>) => engine.isMediaCached(asset),
+      getCachedMediaUsage: (worldId: string) => engine.getCachedMediaUsage(worldId),
       refreshEstimate: async () => {
         await engine.estimateStorage();
       },
@@ -46,6 +52,9 @@ export function useOffline(): OfflineContextValue {
       usedMB: 0,
       quotaMB: 0,
       clearCache: async () => false,
+      cacheMediaAsset: async () => ({ success: false, bytes: 0 }),
+      isMediaCached: async () => false,
+      getCachedMediaUsage: async () => ({ files: 0, bytes: 0 }),
       refreshEstimate: async () => {},
     };
   }

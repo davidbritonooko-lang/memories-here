@@ -10,6 +10,7 @@ import { peshtokRepo } from '@/lib/supabase/db';
 import type { Comment } from '@/types';
 import { generateRandomSimulatedComment } from './simulated-comments';
 import { formatMomentDate } from '@/features/moments/utils';
+import { useToast } from '@/components/ui/toast';
 
 export interface CommentsDrawerProps {
   isOpen: boolean;
@@ -26,30 +27,64 @@ export function CommentsDrawer({
   worldId,
   currentUserName,
 }: CommentsDrawerProps) {
-  const [comments, setComments] = useState<Comment[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
+  const { showToast } = useToast();
+  const [commentsState, setCommentsState] = useState<{
+    videoId: string;
+    comments: Comment[];
+    status: 'loading' | 'loaded';
+  }>({ videoId: '', comments: [], status: 'loading' });
   const [newCommentText, setNewCommentText] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   useEffect(() => {
-    if (isOpen) {
-      void (async () => {
-        setIsLoading(true);
-        try {
-          const data = await peshtokRepo.listComments(videoId);
-          setComments((data || []) as unknown as Comment[]);
-        } catch {
-          setComments([]);
-        } finally {
-          setIsLoading(false);
+    if (!isOpen) return;
+
+    let cancelled = false;
+
+    const loadComments = async () => {
+      try {
+        const data = await peshtokRepo.listComments(videoId);
+        if (!cancelled) {
+          setCommentsState({
+            videoId,
+            comments: (data || []) as unknown as Comment[],
+            status: 'loaded',
+          });
         }
-      })();
-    }
-  }, [isOpen, videoId]);
+      } catch {
+        if (!cancelled) {
+          setCommentsState({ videoId, comments: [], status: 'loaded' });
+          showToast("Couldn't load comments.", 'error');
+        }
+      }
+    };
+
+    void loadComments();
+    return () => {
+      cancelled = true;
+    };
+  }, [isOpen, videoId, showToast]);
+
+  const comments = commentsState.videoId === videoId ? commentsState.comments : [];
+  const isLoading = commentsState.videoId !== videoId || commentsState.status === 'loading';
+
+  const appendComment = (comment: Comment) => {
+    setCommentsState((previous) => ({
+      videoId,
+      comments: previous.videoId === videoId
+        ? [...previous.comments, comment]
+        : [comment],
+      status: 'loaded',
+    }));
+  };
 
   const handleAddComment = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newCommentText.trim()) return;
+    if (!worldId) {
+      showToast('Your private space is unavailable. Reconnect and try again.', 'error');
+      return;
+    }
 
     try {
       setIsSubmitting(true);
@@ -61,14 +96,21 @@ export function CommentsDrawer({
         is_simulated: false,
       });
 
-      setComments((prev) => [...prev, created as unknown as Comment]);
+      appendComment(created as unknown as Comment);
       setNewCommentText('');
+    } catch {
+      showToast("Couldn't add your comment.", 'error');
     } finally {
       setIsSubmitting(false);
     }
   };
 
-  const handleSimulateCozyComment = async () => {
+  const handleAddExampleComment = async () => {
+    if (!worldId) {
+      showToast('Your private space is unavailable. Reconnect and try again.', 'error');
+      return;
+    }
+
     try {
       const simulated = generateRandomSimulatedComment();
       const created = await peshtokRepo.addComment({
@@ -79,9 +121,9 @@ export function CommentsDrawer({
         is_simulated: true,
       });
 
-      setComments((prev) => [...prev, created as unknown as Comment]);
+      appendComment(created as unknown as Comment);
     } catch {
-      // Graceful fallback
+      showToast("Couldn't add the sample comment.", 'error');
     }
   };
 
@@ -90,7 +132,7 @@ export function CommentsDrawer({
       isOpen={isOpen}
       onClose={onClose}
       title={`Comments (${comments.length})`}
-      description="Love, thoughts, and tender words."
+      description="Comments and notes for this clip."
     >
       <div className="flex flex-col gap-4 max-h-[60vh]">
         {/* Comments List */}
@@ -105,10 +147,11 @@ export function CommentsDrawer({
               <Button
                 variant="ghost"
                 size="sm"
-                onClick={handleSimulateCozyComment}
+                onClick={handleAddExampleComment}
+                disabled={!worldId}
                 className="mt-2 text-accent text-xs"
               >
-                <Sparkles className="w-3.5 h-3.5 mr-1" /> Summon warm love
+                <Sparkles className="w-3.5 h-3.5 mr-1" /> Add example comment
               </Button>
             </div>
           ) : (
@@ -127,7 +170,7 @@ export function CommentsDrawer({
                       {comment.author_name}
                     </span>
                     {comment.is_simulated && (
-                      <span className="text-[10px] text-accent/80 font-mono">✨</span>
+                      <span className="text-[10px] text-accent/80 font-mono">SAMPLE</span>
                     )}
                     <span className="text-[10px] text-muted-text ml-auto">
                       {formatMomentDate(comment.created_at, 'short')}
@@ -145,13 +188,13 @@ export function CommentsDrawer({
         {/* Input Bar */}
         <form onSubmit={handleAddComment} className="flex items-center gap-2 pt-2 border-t border-border">
           <Input
-            placeholder="Add a loving thought..."
+            placeholder="Add a comment..."
             value={newCommentText}
             onChange={(e) => setNewCommentText(e.target.value)}
             className="flex-1 text-xs"
           />
 
-          <Button type="submit" size="sm" disabled={isSubmitting || !newCommentText.trim()}>
+          <Button type="submit" size="sm" disabled={isSubmitting || !newCommentText.trim() || !worldId}>
             {isSubmitting ? <Spinner size="sm" /> : <Send className="w-4 h-4" />}
           </Button>
 
@@ -159,8 +202,9 @@ export function CommentsDrawer({
             type="button"
             variant="secondary"
             size="sm"
-            onClick={handleSimulateCozyComment}
-            title="Summon loving comment"
+            onClick={handleAddExampleComment}
+            disabled={!worldId}
+            title="Add generated sample comment"
           >
             <Sparkles className="w-4 h-4 text-accent" />
           </Button>

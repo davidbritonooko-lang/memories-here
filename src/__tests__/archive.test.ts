@@ -1,45 +1,56 @@
-/**
- * Phase 13: Archive Acceptance Tests
- * Validates archive repository methods, filtering logic, and audit contracts.
- * Specification Sections: 29, 30
- */
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { describe, it, expect } from 'vitest';
+const { rpcMock } = vi.hoisted(() => ({
+  rpcMock: vi.fn(),
+}));
+
+vi.mock('@supabase/supabase-js', () => ({
+  createClient: () => ({ rpc: rpcMock }),
+}));
+
 import { archiveRepo } from '@/lib/supabase/db';
 
-describe('Phase 13: Archive Acceptance Tests', () => {
-  describe('Archive Repository API (Spec Section 29, 30)', () => {
-    it('exposes listArchive method', () => {
-      expect(typeof archiveRepo.listArchive).toBe('function');
-    });
+describe('Phase 13: Archive Repository', () => {
+  beforeEach(() => {
+    rpcMock.mockReset();
+    rpcMock.mockResolvedValue({ data: 'entity-1', error: null });
+  });
 
-    it('exposes restoreItem method for recovering archived items', () => {
-      expect(typeof archiveRepo.restoreItem).toBe('function');
-    });
+  it('restores the entity and its archive audit record through one atomic operation', async () => {
+    await archiveRepo.restoreItem('archive-1', 'moment', 'entity-1');
 
-    it('exposes permanentlyDelete method for permanent purging', () => {
-      expect(typeof archiveRepo.permanentlyDelete).toBe('function');
+    expect(rpcMock).toHaveBeenCalledWith('restore_archived_world_entity', {
+      p_archive_item_id: 'archive-1',
+      p_entity_id: 'entity-1',
+      p_entity_type: 'moment',
     });
   });
 
-  describe('Archive Filter & Data Contracts', () => {
-    it('categorizes entities into moment, track, photo, video', () => {
-      const mockItems = [
-        { id: '1', entity_type: 'moment', entity_id: 'm1' },
-        { id: '2', entity_type: 'track', entity_id: 't1' },
-        { id: '3', entity_type: 'photo', entity_id: 'p1' },
-        { id: '4', entity_type: 'video', entity_id: 'v1' },
-      ];
-
-      const moments = mockItems.filter((i) => i.entity_type === 'moment');
-      const tracks = mockItems.filter((i) => i.entity_type === 'track');
-      const photos = mockItems.filter((i) => i.entity_type === 'photo');
-      const videos = mockItems.filter((i) => i.entity_type === 'video');
-
-      expect(moments.length).toBe(1);
-      expect(tracks.length).toBe(1);
-      expect(photos.length).toBe(1);
-      expect(videos.length).toBe(1);
+  it('does not report restore success when the atomic database operation fails', async () => {
+    rpcMock.mockResolvedValueOnce({
+      data: null,
+      error: new Error('database unavailable'),
     });
+
+    await expect(
+      archiveRepo.restoreItem('archive-1', 'moment', 'entity-1')
+    ).rejects.toThrow('database unavailable');
+  });
+
+  it('purges an archived entity and its audit record through one atomic operation', async () => {
+    await archiveRepo.permanentlyDelete('archive-1', 'photo', 'entity-1');
+
+    expect(rpcMock).toHaveBeenCalledWith('purge_archived_world_entity', {
+      p_archive_item_id: 'archive-1',
+      p_entity_id: 'entity-1',
+      p_entity_type: 'photo',
+    });
+  });
+
+  it('rejects unsupported entity types before calling the database', async () => {
+    await expect(
+      archiveRepo.restoreItem('archive-1', 'unsupported', 'entity-1')
+    ).rejects.toThrow('Unsupported archive entity type.');
+    expect(rpcMock).not.toHaveBeenCalled();
   });
 });

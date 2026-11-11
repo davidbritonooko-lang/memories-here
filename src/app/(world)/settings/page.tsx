@@ -19,36 +19,52 @@ import { useTheme } from '@/features/settings';
 import { useMusic } from '@/engines/music';
 import { useOffline } from '@/engines/offline';
 import { useInstallation } from '@/engines/installation';
-import { worldRepo } from '@/lib/supabase/db';
+import { worldRepo, photosRepo, videosRepo, soundtrackRepo } from '@/lib/supabase/db';
+import { getSignedUrl } from '@/lib/storage/client';
+import type { OfflineMediaBucket } from '@/engines/offline/engine';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Spinner } from '@/components/ui/spinner';
 import { useToast } from '@/components/ui/toast';
 import type { ThemePreference } from '@/types';
+import { APP_NAME } from '@/types/constants';
 
 export default function SettingsPage() {
   const { identity } = useWorldIdentity();
   const { theme, setTheme } = useTheme();
   const { engine, state: musicState } = useMusic();
-  const { usedMB, quotaMB, clearCache, refreshEstimate } = useOffline();
+  const {
+    usedMB,
+    quotaMB,
+    clearCache,
+    refreshEstimate,
+    cacheMediaAsset,
+    isMediaCached,
+    getCachedMediaUsage,
+    isOnline,
+  } = useOffline();
   const { isInstalled, isInstallable, promptInstall, platform } = useInstallation();
   const { showToast } = useToast();
 
   const [isSaving, setIsSaving] = useState(false);
   const [isClearing, setIsClearing] = useState(false);
+  const [isCaching, setIsCaching] = useState(false);
 
-  const worldId =
-    identity?.worldId ||
-    (identity?.displayName ? `world-${identity.displayName.toLowerCase()}` : 'default-world');
+  const worldId = identity?.worldId ?? null;
 
   const handleSavePreferences = async () => {
+    if (!worldId) {
+      showToast('Your private space is unavailable. Reconnect and try again.', 'error');
+      return;
+    }
+
     setIsSaving(true);
     try {
       await worldRepo.updatePreferences(worldId, {
         theme,
         music_volume: musicState.volume,
         offline_preferences: {
-          auto_cache_moments: true,
+          auto_cache_moments: false,
           max_storage_mb: 1024,
         },
       });
@@ -77,10 +93,107 @@ export default function SettingsPage() {
     }
   };
 
+  const handleCacheMediaForOffline = async () => {
+    if (!worldId) {
+      showToast('Your private space is unavailable. Reconnect and try again.', 'error');
+      return;
+    }
+    if (!isOnline) {
+      showToast('Connect to the internet before saving media offline.', 'error');
+      return;
+    }
+
+    setIsCaching(true);
+    try {
+      const [photos, videos, tracks] = await Promise.all([
+        photosRepo.listByWorld(worldId),
+        videosRepo.listByWorld(worldId),
+        soundtrackRepo.listTracks(worldId),
+      ]);
+
+      const assets: Array<{
+        bucket: OfflineMediaBucket;
+        storagePath: string;
+        sizeBytes: number;
+      }> = [
+        ...(photos ?? []).flatMap((photo) => [
+          { bucket: 'photos' as const, storagePath: photo.storage_path, sizeBytes: photo.file_size },
+          ...(photo.thumbnail_path ? [{
+            bucket: 'thumbnails' as const,
+            storagePath: photo.thumbnail_path,
+            sizeBytes: 5 * 1024 * 1024,
+          }] : []),
+        ]),
+        ...(videos ?? []).flatMap((video) => [
+          { bucket: 'videos' as const, storagePath: video.storage_path, sizeBytes: video.file_size },
+          ...(video.thumbnail_path ? [{
+            bucket: 'thumbnails' as const,
+            storagePath: video.thumbnail_path,
+            sizeBytes: 0,
+          }] : []),
+        ]),
+        ...(tracks ?? []).map((track) => ({
+          bucket: 'audio' as const,
+          storagePath: track.storage_path,
+          sizeBytes: track.file_size,
+        })),
+      ];
+
+      const maxBytes = 1024 * 1024 * 1024;
+      const existingUsage = await getCachedMediaUsage(worldId);
+      let savedCount = existingUsage.files;
+      let failedCount = 0;
+      let skippedCount = 0;
+      let savedBytes = existingUsage.bytes;
+
+      for (const asset of assets) {
+        const cacheKey = { worldId, bucket: asset.bucket, storagePath: asset.storagePath };
+        if (await isMediaCached(cacheKey)) continue;
+
+        if (!asset.sizeBytes || asset.sizeBytes > maxBytes - savedBytes) {
+          skippedCount += 1;
+          continue;
+        }
+
+        const signed = await getSignedUrl(asset.bucket, asset.storagePath);
+        if (!signed.url) {
+          failedCount += 1;
+          continue;
+        }
+
+        const result = await cacheMediaAsset({
+          worldId,
+          bucket: asset.bucket,
+          storagePath: asset.storagePath,
+          signedUrl: signed.url,
+          sizeBytes: asset.sizeBytes,
+        });
+
+        if (result.success) {
+          savedCount += 1;
+          savedBytes += result.bytes;
+        } else {
+          failedCount += 1;
+        }
+      }
+
+      await refreshEstimate();
+      const savedMB = (savedBytes / (1024 * 1024)).toFixed(1);
+      showToast(
+        `Offline cache now contains ${savedCount} files (${savedMB} MB). ${failedCount} failed; ${skippedCount} skipped by the 1 GB limit or missing size metadata.`,
+        failedCount > 0 ? 'info' : 'success'
+      );
+    } catch {
+      showToast("Couldn't prepare your media for offline use.", 'error');
+    } finally {
+      setIsCaching(false);
+    }
+  };
+
   const handleInstallClick = async () => {
     const installed = await promptInstall();
     if (installed) {
-      showToast('Her World installed successfully!', 'success');
+      showToast(`${APP_NAME} installed successfully!`, 'success');
     }
   };
 
@@ -97,7 +210,7 @@ export default function SettingsPage() {
           </h1>
         </div>
         <p className="mt-1 text-sm text-secondary-text">
-          Personalize the atmosphere, audio, and offline behavior of her private world.
+          Personalize the appearance, audio, and offline settings of your private space.
         </p>
       </div>
 
@@ -110,7 +223,7 @@ export default function SettingsPage() {
             </div>
             <div>
               <h2 className="text-base font-semibold text-primary-text">Identity & Space</h2>
-              <p className="text-xs text-secondary-text">Her recognized presence in this world.</p>
+              <p className="text-xs text-secondary-text">Your profile and private-space details.</p>
             </div>
           </div>
 
@@ -120,7 +233,7 @@ export default function SettingsPage() {
                 Display Name
               </span>
               <p className="mt-0.5 text-sm font-medium text-primary-text">
-                {identity?.displayName || 'Peshie'}
+                {identity?.displayName || 'Not set'}
               </p>
             </div>
 
@@ -129,7 +242,7 @@ export default function SettingsPage() {
                 World Identifier
               </span>
               <p className="mt-0.5 text-xs font-mono text-secondary-text truncate">
-                {worldId}
+                {worldId || 'Unavailable'}
               </p>
             </div>
           </div>
@@ -217,7 +330,7 @@ export default function SettingsPage() {
           </div>
         </Card>
 
-        {/* Offline Storage Cache */}
+        {/* Browser Storage Cache */}
         <Card variant="default" className="p-5 sm:p-6 flex flex-col gap-4">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
@@ -225,19 +338,29 @@ export default function SettingsPage() {
                 <HardDrive className="w-5 h-5" />
               </div>
               <div>
-                <h2 className="text-base font-semibold text-primary-text">Offline Storage</h2>
-                <p className="text-xs text-secondary-text">Media cached locally for instant offline moments.</p>
+                <h2 className="text-base font-semibold text-primary-text">Browser Storage</h2>
+                <p className="text-xs text-secondary-text">Save up to 1 GB of photos, videos, and soundtrack files on this device for offline media access. Cached files are not separately encrypted; only save them on a device you control. App pages still need a connection to load.</p>
               </div>
             </div>
 
-            <Button
-              size="sm"
-              variant="secondary"
-              onClick={handleClearCache}
-              disabled={isClearing}
-            >
-              {isClearing ? <Spinner size="sm" /> : 'Clear Cache'}
-            </Button>
+            <div className="flex flex-wrap gap-2 justify-end">
+              <Button
+                size="sm"
+                variant="secondary"
+                onClick={handleCacheMediaForOffline}
+                disabled={isCaching || !worldId || !isOnline}
+              >
+                {isCaching ? <Spinner size="sm" /> : 'Save Media Offline'}
+              </Button>
+              <Button
+                size="sm"
+                variant="secondary"
+                onClick={handleClearCache}
+                disabled={isClearing}
+              >
+                {isClearing ? <Spinner size="sm" /> : 'Clear Cache'}
+              </Button>
+            </div>
           </div>
 
           <div className="flex items-center justify-between p-3.5 rounded-xl bg-surface border border-border text-xs">
@@ -257,7 +380,7 @@ export default function SettingsPage() {
               </div>
               <div>
                 <h2 className="text-base font-semibold text-primary-text">App Experience</h2>
-                <p className="text-xs text-secondary-text">Install Her World directly to your home screen.</p>
+                <p className="text-xs text-secondary-text">Install {APP_NAME} on your device.</p>
               </div>
             </div>
 
@@ -282,7 +405,7 @@ export default function SettingsPage() {
 
       {/* Floating Save Actions */}
       <div className="flex items-center justify-end gap-3 mt-4">
-        <Button onClick={handleSavePreferences} disabled={isSaving}>
+        <Button onClick={handleSavePreferences} disabled={isSaving || !worldId}>
           {isSaving ? <Spinner size="sm" /> : <Sparkles className="w-4 h-4 mr-1.5" />}
           Save World Preferences
         </Button>

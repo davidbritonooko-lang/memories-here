@@ -9,6 +9,7 @@
 import { getSupabaseBrowserClient } from '@/lib/supabase/client';
 import { type StorageBucket, buildStoragePath } from './constants';
 import { validateFile, type ValidationResult } from './validation';
+import { getCachedMediaUrl, type OfflineMediaBucket } from '@/engines/offline/engine';
 
 // ---------------------------------------------------------------------------
 // Result types
@@ -141,25 +142,49 @@ export async function getSignedUrl(
   storagePath: string,
   expiresInSeconds = 3600,
 ): Promise<{ url: string | null; error: StorageError | null }> {
-  const supabase = getSupabaseBrowserClient();
+  const worldId = storagePath.split('/')[0];
 
-  const { data, error } = await supabase.storage
-    .from(bucket)
-    .createSignedUrl(storagePath, expiresInSeconds);
+  try {
+    const supabase = getSupabaseBrowserClient();
+    const { data, error } = await supabase.storage
+      .from(bucket)
+      .createSignedUrl(storagePath, expiresInSeconds);
 
-  if (error) {
+    if (!error && data?.signedUrl) {
+      return { url: data.signedUrl, error: null };
+    }
+
+    const cachedUrl = await getCachedMediaUrl(
+      worldId,
+      bucket as OfflineMediaBucket,
+      storagePath
+    );
+    if (cachedUrl) return { url: cachedUrl, error: null };
+
     return {
       url: null,
       error: {
-        message: error.message,
+        message: error?.message || 'No signed URL was returned.',
+        userMessage: "Couldn't load this file right now. Try again.",
+      },
+    };
+  } catch (cause) {
+    const cachedUrl = await getCachedMediaUrl(
+      worldId,
+      bucket as OfflineMediaBucket,
+      storagePath
+    );
+    if (cachedUrl) return { url: cachedUrl, error: null };
+
+    return {
+      url: null,
+      error: {
+        message: cause instanceof Error ? cause.message : 'Storage request failed.',
         userMessage: "Couldn't load this file right now. Try again.",
       },
     };
   }
-
-  return { url: data.signedUrl, error: null };
 }
-
 /**
  * Creates signed URLs for multiple storage paths in a single request.
  */
@@ -168,28 +193,59 @@ export async function getSignedUrls(
   storagePaths: string[],
   expiresInSeconds = 3600,
 ): Promise<{ urls: (string | null)[]; error: StorageError | null }> {
-  const supabase = getSupabaseBrowserClient();
+  const resolveCachedUrls = async (): Promise<(string | null)[]> =>
+    Promise.all(
+      storagePaths.map((storagePath) =>
+        getCachedMediaUrl(
+          storagePath.split('/')[0],
+          bucket as OfflineMediaBucket,
+          storagePath
+        )
+      )
+    );
 
-  const { data, error } = await supabase.storage
-    .from(bucket)
-    .createSignedUrls(storagePaths, expiresInSeconds);
+  try {
+    const supabase = getSupabaseBrowserClient();
+    const { data, error } = await supabase.storage
+      .from(bucket)
+      .createSignedUrls(storagePaths, expiresInSeconds);
 
-  if (error) {
+    const urls = await Promise.all(
+      storagePaths.map(async (storagePath, index) => {
+        const signedUrl = data?.[index]?.signedUrl;
+        if (signedUrl) return signedUrl;
+        return getCachedMediaUrl(
+          storagePath.split('/')[0],
+          bucket as OfflineMediaBucket,
+          storagePath
+        );
+      })
+    );
+
+    const missingUrl = urls.some((url) => !url);
     return {
-      urls: [],
-      error: {
-        message: error.message,
-        userMessage: "Couldn't load some files. Try again.",
-      },
+      urls,
+      error: missingUrl
+        ? {
+            message: error?.message || 'One or more media URLs are unavailable.',
+            userMessage: "Couldn't load some files. Try again.",
+          }
+        : null,
+    };
+  } catch (cause) {
+    const urls = await resolveCachedUrls();
+    const missingUrl = urls.some((url) => !url);
+    return {
+      urls,
+      error: missingUrl
+        ? {
+            message: cause instanceof Error ? cause.message : 'Storage request failed.',
+            userMessage: "Couldn't load some files. Try again.",
+          }
+        : null,
     };
   }
-
-  return {
-    urls: (data || []).map((item) => item.signedUrl),
-    error: null,
-  };
 }
-
 /**
  * Downloads a file from storage as a Blob.
  */

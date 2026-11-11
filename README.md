@@ -1,6 +1,6 @@
-# Peshie — Her World
+# Peshie
 
-A private, personal space for moments, media, and a soundtrack. The app is built
+A private personal archive for moments, media, notes, and soundtracks. The app is built
 with Next.js 16, React, TypeScript, and Supabase.
 
 ## Project status and phases
@@ -16,7 +16,7 @@ control issues found before starting the next feature phase.
 | 4–9 | Identity, database, storage, media, music engine, and soundtrack library | Baseline implemented; identity and authorization hardened in this pass |
 | 10 | Moments list and creation | Initial implementation; detail route remains a stub |
 | **11–12** | **Moment Engine and moment detail experience** | **Next phase; not started** |
-| 13 | Archive | Stub |
+| 13 | Archive | Transactional restore/purge with a durable private Storage cleanup queue |
 | 14–16 | PeshTok | Stub |
 | 20 | Settings | Stub |
 | 21 | Home experience | Stub |
@@ -41,10 +41,10 @@ acceptance criteria before building the feature.
 
 5. Open <http://localhost:3000>.
 
-The existing project must have all three migrations applied. In particular,
+The existing project must have all five migrations applied. In particular,
 `003_private_world_auth.sql` hashes existing world access keys, removes the raw
 key column, and replaces the earlier open policies. Do not deploy the app with
-only migrations 001 and 002 applied.
+only migrations 001–004 applied.
 
 ## Environment
 
@@ -58,6 +58,7 @@ environment:
 | `SUPABASE_SERVICE_ROLE_KEY` | Server-only key used to create/restore a world |
 | `SUPABASE_JWT_SECRET` | Server-only Supabase JWT signing secret used for short-lived world-scoped sessions |
 | `SUPABASE_URL` | Optional server-side project URL; falls back to `NEXT_PUBLIC_SUPABASE_URL` |
+| `CRON_SECRET` | Required to authenticate the scheduled Vercel Storage cleanup job |
 
 Never prefix `SUPABASE_SERVICE_ROLE_KEY` or `SUPABASE_JWT_SECRET` with
 `NEXT_PUBLIC_`, commit them, or send them to the browser. The service-role key
@@ -101,9 +102,9 @@ project. Do not use production credentials to run tests.
   fails. Upload success now requires a valid signed URL.
 - Replaced race-prone client track numbering with an atomic database function
   and stopped querying track numbers before validating uploads.
-- Made archive/restore changes and their audit records transactional and
-  world-scoped.
-- Removed silent empty-library fallbacks so soundtrack load failures are
-  reported to the user.
+- Added world-scoped transactional archive restore and purge operations. Purges enqueue private Storage objects for deletion; the authenticated cleanup endpoint processes them on archive visits, and a daily Vercel Cron retries pending jobs. The queue is protected by RLS and the purge function runs with invoker privileges.
+- Added opt-in, world-scoped local caching for photos, videos, and soundtrack media. A service worker serves cached media after a network failure; app pages themselves still require connectivity. Offline media caches are cleared on logout, when the active world changes, and after permanent archive deletion. Cached media is stored in browser Cache Storage and is not separately encrypted.
+- Replaced relationship-oriented onboarding with neutral private-space setup and updated home greetings.
+- Removed silent empty-library fallbacks so soundtrack load failures are reported to the user.
 - Added server configuration and setup guidance, clarified the phase roadmap,
-  and expanded tests for authenticated access and sequential playback.
+  and expanded tests for authenticated access, sequential playback, archive transactions, and cache isolation.

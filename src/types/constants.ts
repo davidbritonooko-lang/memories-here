@@ -1,14 +1,16 @@
 /**
- * Peshie — Her World
- * Foundational Product Constants & Approved Structure
- * Specification Sections: 1, 3, 7, 8
+ * Product identity and approved structure.
+ * Keep the production-facing product name in APP_NAME so a future rebrand
+ * can update one source of truth.
  */
 
+export const APP_NAME = 'Peshie' as const;
+
 export const PRODUCT_IDENTITY = {
-  name: 'Peshie — Her World',
-  category: 'Private personal memory world / installable progressive web application',
-  positioning: 'A little corner of the internet that belongs to her.',
-  statement: 'I noticed these things about your life, and I thought they were worth keeping.',
+  name: APP_NAME,
+  category: 'Private personal archive / installable progressive web application',
+  positioning: 'A private space for moments, media, and memories.',
+  statement: 'Keep photos, videos, notes, and soundtracks together in one private space.',
 } as const;
 
 export interface NavItem {
@@ -23,7 +25,7 @@ export const APPROVED_NAVIGATION: readonly NavItem[] = [
     id: 'home',
     label: 'Home',
     href: '/',
-    description: 'Timeless entry to her world',
+    description: 'Entry to your private space',
   },
   {
     id: 'moments',

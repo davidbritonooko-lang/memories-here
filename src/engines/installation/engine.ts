@@ -29,6 +29,17 @@ export class InstallationEngine {
   };
   private listeners: Set<(state: InstallationState) => void> = new Set();
 
+  private readonly handleBeforeInstallPrompt = (event: Event) => {
+    event.preventDefault();
+    this.deferredPrompt = event as BeforeInstallPromptEvent;
+    this.updateState({ isInstallable: true });
+  };
+
+  private readonly handleAppInstalled = () => {
+    this.deferredPrompt = null;
+    this.updateState({ isInstalled: true, isInstallable: false });
+  };
+
   constructor() {
     if (typeof window !== 'undefined') {
       this.init();
@@ -40,17 +51,10 @@ export class InstallationEngine {
     this.checkStandalone();
 
     // Listen for beforeinstallprompt (Chromium / Android)
-    window.addEventListener('beforeinstallprompt', (e) => {
-      e.preventDefault();
-      this.deferredPrompt = e as BeforeInstallPromptEvent;
-      this.updateState({ isInstallable: true });
-    });
+    window.addEventListener('beforeinstallprompt', this.handleBeforeInstallPrompt);
 
     // Listen for appinstalled
-    window.addEventListener('appinstalled', () => {
-      this.deferredPrompt = null;
-      this.updateState({ isInstalled: true, isInstallable: false });
-    });
+    window.addEventListener('appinstalled', this.handleAppInstalled);
   }
 
   private detectPlatform() {
@@ -70,7 +74,8 @@ export class InstallationEngine {
 
   private checkStandalone() {
     const isStandalone =
-      window.matchMedia('(display-mode: standalone)').matches ||
+      (typeof window.matchMedia === 'function' &&
+        window.matchMedia('(display-mode: standalone)').matches) ||
       (navigator as unknown as { standalone?: boolean }).standalone === true;
 
     this.state.isStandalone = isStandalone;
@@ -88,18 +93,31 @@ export class InstallationEngine {
       return false;
     }
 
+    const promptEvent = this.deferredPrompt;
+    this.deferredPrompt = null;
+
     try {
-      await this.deferredPrompt.prompt();
-      const choice = await this.deferredPrompt.userChoice;
-      if (choice.outcome === 'accepted') {
-        this.updateState({ isInstalled: true, isInstallable: false });
-        this.deferredPrompt = null;
-        return true;
-      }
-      return false;
+      await promptEvent.prompt();
+      const choice = await promptEvent.userChoice;
+      const accepted = choice.outcome === 'accepted';
+      this.updateState({
+        isInstalled: accepted || this.state.isInstalled,
+        isInstallable: false,
+      });
+      return accepted;
     } catch {
+      this.updateState({ isInstallable: false });
       return false;
     }
+  }
+
+  public destroy(): void {
+    if (typeof window !== 'undefined') {
+      window.removeEventListener('beforeinstallprompt', this.handleBeforeInstallPrompt);
+      window.removeEventListener('appinstalled', this.handleAppInstalled);
+    }
+    this.deferredPrompt = null;
+    this.listeners.clear();
   }
 
   public subscribe(listener: (state: InstallationState) => void): () => void {

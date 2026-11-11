@@ -6,7 +6,7 @@ export default defineConfig({
     environment: 'happy-dom',
     pool: 'forks',
     fileParallelism: false,
-    isolate: false,
+    isolate: true,
     testTimeout: 30000,
     setupFiles: ['./vitest.setup.ts'],
   },

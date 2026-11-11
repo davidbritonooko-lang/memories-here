@@ -4,6 +4,7 @@ import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { Archive, Sparkles, Filter } from 'lucide-react';
 import { useWorldIdentity } from '@/features/identity';
 import { archiveRepo } from '@/lib/supabase/db';
+import { useOffline } from '@/engines/offline';
 import { useToast } from '@/components/ui/toast';
 import { Tabs } from '@/components/ui/tabs';
 import { Spinner } from '@/components/ui/spinner';
@@ -16,17 +17,22 @@ type FilterType = 'all' | EntityType;
 export default function ArchivePage() {
   const { identity } = useWorldIdentity();
   const { showToast } = useToast();
+  const { clearCache, refreshEstimate } = useOffline();
 
   const [items, setItems] = useState<EnrichedArchiveItem[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [filter, setFilter] = useState<FilterType>('all');
   const [processingId, setProcessingId] = useState<string | null>(null);
 
-  const worldId =
-    identity?.worldId ||
-    (identity?.displayName ? `world-${identity.displayName.toLowerCase()}` : 'default-world');
+  const worldId = identity?.worldId ?? null;
 
   const loadArchive = useCallback(async () => {
+    if (!worldId) {
+      setItems([]);
+      setIsLoading(false);
+      return;
+    }
+
     setIsLoading(true);
     try {
       const data = await archiveRepo.listArchive(worldId);
@@ -43,6 +49,14 @@ export default function ArchivePage() {
       await loadArchive();
     })();
   }, [loadArchive]);
+
+  useEffect(() => {
+    if (!worldId) return;
+    void fetch('/api/storage/cleanup', {
+      method: 'POST',
+      credentials: 'same-origin',
+    }).catch(() => undefined);
+  }, [worldId]);
 
   // Filtered items
   const filteredItems = useMemo(() => {
@@ -66,7 +80,7 @@ export default function ArchivePage() {
     try {
       await archiveRepo.restoreItem(item.id, item.entity_type, item.entity_id);
       setItems((prev) => prev.filter((i) => i.id !== item.id));
-      showToast(`Restored ${item.entity_type} back to Her World.`, 'success');
+      showToast(`Restored ${item.entity_type} to your private archive.`, 'success');
     } catch {
       showToast(`Couldn't restore this ${item.entity_type}.`, 'error');
     } finally {
@@ -82,8 +96,32 @@ export default function ArchivePage() {
     setProcessingId(item.id);
     try {
       await archiveRepo.permanentlyDelete(item.id, item.entity_type, item.entity_id);
+
+      // Purged media must not remain available from this device's offline cache.
+      const localCacheCleared = await clearCache();
+      await refreshEstimate();
+
+      let cleanupPending = true;
+      try {
+        const response = await fetch('/api/storage/cleanup', {
+          method: 'POST',
+          credentials: 'same-origin',
+        });
+        if (response.ok) {
+          const result = (await response.json()) as { pending?: number };
+          cleanupPending = typeof result.pending !== 'number' || result.pending > 0;
+        }
+      } catch {
+        cleanupPending = true;
+      }
+
       setItems((prev) => prev.filter((i) => i.id !== item.id));
-      showToast(`Permanently deleted ${item.entity_type}.`, 'info');
+      showToast(
+        cleanupPending || !localCacheCleared
+          ? 'Record removed. Server media cleanup or local cache cleanup could not be confirmed; pending cleanup will retry.'
+          : `Permanently deleted ${item.entity_type}, its stored media, and this device’s offline cache.`,
+        cleanupPending || !localCacheCleared ? 'error' : 'info'
+      );
     } catch {
       showToast(`Couldn't delete this ${item.entity_type}.`, 'error');
     } finally {
@@ -134,7 +172,7 @@ export default function ArchivePage() {
           <EmptyState
             icon={<Sparkles className="w-6 h-6" />}
             title="The archive is quiet"
-            description="Nothing has been archived. Every moment, track, and memory is alive and present in her world."
+            description="Nothing has been archived. Your moments, tracks, and media will appear here when archived."
           />
         ) : (
           <EmptyState

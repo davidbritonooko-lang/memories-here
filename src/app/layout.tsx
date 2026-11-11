@@ -7,6 +7,7 @@ import { WorldIdentityProvider } from '@/features/identity';
 import { MusicProvider } from '@/engines/music';
 import { InstallationProvider } from '@/engines/installation';
 import { OfflineProvider } from '@/engines/offline';
+import { APP_NAME, PRODUCT_IDENTITY } from '@/types/constants';
 
 const inter = Inter({
   variable: '--font-inter',
@@ -29,12 +30,19 @@ const spaceGrotesk = Space_Grotesk({
 });
 
 export const metadata: Metadata = {
-  title: 'Peshie — Her World',
-  description: 'A little corner of the internet that belongs to her.',
+  title: PRODUCT_IDENTITY.name,
+  icons: {
+    icon: [
+      { url: '/icon-192.png', sizes: '192x192', type: 'image/png' },
+      { url: '/icon-512.png', sizes: '512x512', type: 'image/png' },
+    ],
+    apple: [{ url: '/apple-touch-icon.png', sizes: '180x180', type: 'image/png' }],
+  },
+  description: PRODUCT_IDENTITY.positioning,
   appleWebApp: {
     capable: true,
     statusBarStyle: 'default',
-    title: 'Peshie',
+    title: APP_NAME,
   },
 };
 

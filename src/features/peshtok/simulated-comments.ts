@@ -1,7 +1,6 @@
 /**
- * PeshTok Simulated Social Engagement Engine
- * Generates affectionate, tender, and supportive comments
- * customized for Her World (Specification Section 35).
+ * PeshTok sample-comment generator.
+ * Generated entries are demo content and are visibly labelled as samples in the UI.
  */
 
 export interface SimulatedCommentTemplate {
@@ -15,42 +14,42 @@ export const SIMULATED_COMMENT_POOL: SimulatedCommentTemplate[] = [
     author: 'Aura',
     avatarSeed: 'aura',
     messages: [
-      'The prettiest girl in every single room ✨',
-      'The lighting was made for you honestly 🤍',
-      'How are you real though? 🌸',
+      'Great framing and color ✨',
+      'The lighting works beautifully.',
+      'This moment feels cinematic.',
     ],
   },
   {
     author: 'Milo',
     avatarSeed: 'milo',
     messages: [
-      'Queen of my entire universe 👑',
-      'This outfit is simply iconic!',
-      'That smile fixes my entire day 💕',
+      'Excellent clip.',
+      'The edit is so clean!',
+      'That soundtrack fits perfectly.',
     ],
   },
   {
     author: 'Celeste',
     avatarSeed: 'celeste',
     messages: [
-      'Pure cinematic perfection ✨',
-      'Saving this to my comfort folder forever 🧸',
-      'Her aura is unmatched 🕊️',
+      'Strong visual storytelling ✨',
+      'Added this to my sample favorites.',
+      'The atmosphere works really well.',
     ],
   },
   {
     author: 'Nova',
     avatarSeed: 'nova',
     messages: [
-      'Always glowing, always breathtaking 💖',
-      'The main character of this whole world 💫',
-      'Softest vibes ever ☁️',
+      'Great visual composition.',
+      'A memorable moment, well captured.',
+      'Excellent soundtrack choice.',
     ],
   },
 ];
 
 /**
- * Returns a randomized simulated comment for a video.
+ * Returns a randomized, explicitly simulated sample comment for a video.
  */
 export function generateRandomSimulatedComment(): {
   author_name: string;

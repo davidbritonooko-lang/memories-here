@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach, vi } from 'vitest';
+import { afterEach, describe, it, expect, beforeEach, vi } from 'vitest';
 import { MusicEngine } from '@/engines/music/engine';
 import type { Track } from '@/types';
 
@@ -30,7 +30,28 @@ describe('Phase 8: Music Engine Acceptance Tests', () => {
   let engine: MusicEngine;
 
   beforeEach(() => {
+    vi.stubGlobal('Audio', vi.fn(function AudioMock() {
+      return {
+        currentTime: 0,
+        duration: 180,
+        volume: 1,
+        preload: '',
+        src: '',
+        load: vi.fn(),
+        play: vi.fn().mockResolvedValue(undefined),
+        pause: vi.fn(),
+        removeAttribute: vi.fn(),
+        ontimeupdate: null,
+        ondurationchange: null,
+        onended: null,
+        onerror: null,
+      };
+    }));
     engine = new MusicEngine(async (track) => `https://audio.example/${track.id}`);
+  });
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
   });
 
   describe('Global Music Engine State Model (Spec Section 22)', () => {
@@ -98,6 +119,73 @@ describe('Phase 8: Music Engine Acceptance Tests', () => {
       const state = engine.getState();
       expect(state.currentOwner).toBe('home');
       expect(state.previousContext).toBeNull();
+    });
+
+    it('reloads the saved track and restores its position when returning to a previous context', async () => {
+      const audio = {
+        currentTime: 0,
+        duration: 180,
+        volume: 1,
+        preload: '',
+        src: '',
+        load: vi.fn(),
+        play: vi.fn().mockResolvedValue(undefined),
+        pause: vi.fn(),
+        removeAttribute: vi.fn(),
+        ontimeupdate: null,
+        ondurationchange: null,
+        onended: null,
+        onerror: null,
+      } as unknown as HTMLAudioElement;
+      vi.stubGlobal('Audio', vi.fn(function AudioMock() { return audio; }));
+
+      const resolveTrackUrl = vi.fn(async (track: Track) => `https://audio.example/${track.id}`);
+      const contextEngine = new MusicEngine(resolveTrackUrl);
+
+      await contextEngine.load(mockTrack1, 'https://audio.example/track-1', false);
+      await contextEngine.play();
+      contextEngine.seek(32);
+      contextEngine.requestContext('moment:mom-restore');
+      await contextEngine.load(mockTrack2, 'https://audio.example/track-2', false);
+
+      await contextEngine.releaseContext('moment:mom-restore', true);
+
+      expect(resolveTrackUrl).toHaveBeenCalledWith(mockTrack1);
+      expect(audio.src).toBe('https://audio.example/track-1');
+      expect(audio.currentTime).toBe(32);
+      expect(audio.play).toHaveBeenCalledTimes(2);
+      expect(contextEngine.getState().currentTrack?.id).toBe(mockTrack1.id);
+      expect(contextEngine.getState().playbackState).toBe('playing');
+    });
+
+    it('stops context audio when the previous context had no track', async () => {
+      const audio = {
+        currentTime: 0,
+        duration: 180,
+        volume: 1,
+        preload: '',
+        src: '',
+        load: vi.fn(),
+        play: vi.fn().mockResolvedValue(undefined),
+        pause: vi.fn(),
+        removeAttribute: vi.fn(),
+        ontimeupdate: null,
+        ondurationchange: null,
+        onended: null,
+        onerror: null,
+      } as unknown as HTMLAudioElement;
+      vi.stubGlobal('Audio', vi.fn(function AudioMock() { return audio; }));
+
+      const contextEngine = new MusicEngine(async (track) => `https://audio.example/${track.id}`);
+      contextEngine.requestContext('moment:mom-empty');
+      await contextEngine.load(mockTrack2, 'https://audio.example/track-2', false);
+
+      await contextEngine.releaseContext('moment:mom-empty', true);
+
+      expect(audio.pause).toHaveBeenCalled();
+      expect(audio.removeAttribute).toHaveBeenCalledWith('src');
+      expect(contextEngine.getState().currentTrack).toBeNull();
+      expect(contextEngine.getState().playbackState).toBe('idle');
     });
 
     it('does not allow arbitrary context release from non-owners', async () => {
