@@ -25,6 +25,7 @@ import { Button } from '@/components/ui/button';
 import { Spinner } from '@/components/ui/spinner';
 import { useToast } from '@/components/ui/toast';
 import type { ThemePreference } from '@/types';
+import { APP_NAME } from '@/types/constants';
 
 export default function SettingsPage() {
   const { identity } = useWorldIdentity();
@@ -37,11 +38,14 @@ export default function SettingsPage() {
   const [isSaving, setIsSaving] = useState(false);
   const [isClearing, setIsClearing] = useState(false);
 
-  const worldId =
-    identity?.worldId ||
-    (identity?.displayName ? `world-${identity.displayName.toLowerCase()}` : 'default-world');
+  const worldId = identity?.worldId ?? null;
 
   const handleSavePreferences = async () => {
+    if (!worldId) {
+      showToast('Your private space is unavailable. Reconnect and try again.', 'error');
+      return;
+    }
+
     setIsSaving(true);
     try {
       await worldRepo.updatePreferences(worldId, {
@@ -80,7 +84,7 @@ export default function SettingsPage() {
   const handleInstallClick = async () => {
     const installed = await promptInstall();
     if (installed) {
-      showToast('Her World installed successfully!', 'success');
+      showToast(`${APP_NAME} installed successfully!`, 'success');
     }
   };
 
@@ -97,7 +101,7 @@ export default function SettingsPage() {
           </h1>
         </div>
         <p className="mt-1 text-sm text-secondary-text">
-          Personalize the atmosphere, audio, and offline behavior of her private world.
+          Personalize the appearance, audio, and offline settings of your private space.
         </p>
       </div>
 
@@ -110,7 +114,7 @@ export default function SettingsPage() {
             </div>
             <div>
               <h2 className="text-base font-semibold text-primary-text">Identity & Space</h2>
-              <p className="text-xs text-secondary-text">Her recognized presence in this world.</p>
+              <p className="text-xs text-secondary-text">Your profile and private-space details.</p>
             </div>
           </div>
 
@@ -120,7 +124,7 @@ export default function SettingsPage() {
                 Display Name
               </span>
               <p className="mt-0.5 text-sm font-medium text-primary-text">
-                {identity?.displayName || 'Peshie'}
+                {identity?.displayName || 'Not set'}
               </p>
             </div>
 
@@ -129,7 +133,7 @@ export default function SettingsPage() {
                 World Identifier
               </span>
               <p className="mt-0.5 text-xs font-mono text-secondary-text truncate">
-                {worldId}
+                {worldId || 'Unavailable'}
               </p>
             </div>
           </div>
@@ -217,7 +221,7 @@ export default function SettingsPage() {
           </div>
         </Card>
 
-        {/* Offline Storage Cache */}
+        {/* Browser Storage Cache */}
         <Card variant="default" className="p-5 sm:p-6 flex flex-col gap-4">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
@@ -226,7 +230,7 @@ export default function SettingsPage() {
               </div>
               <div>
                 <h2 className="text-base font-semibold text-primary-text">Offline Storage</h2>
-                <p className="text-xs text-secondary-text">Media cached locally for instant offline moments.</p>
+                <p className="text-xs text-secondary-text">Browser storage currently used by the app. Media downloads for offline use are not available yet.</p>
               </div>
             </div>
 
@@ -257,7 +261,7 @@ export default function SettingsPage() {
               </div>
               <div>
                 <h2 className="text-base font-semibold text-primary-text">App Experience</h2>
-                <p className="text-xs text-secondary-text">Install Her World directly to your home screen.</p>
+                <p className="text-xs text-secondary-text">Install Peshie on your device.</p>
               </div>
             </div>
 
@@ -282,7 +286,7 @@ export default function SettingsPage() {
 
       {/* Floating Save Actions */}
       <div className="flex items-center justify-end gap-3 mt-4">
-        <Button onClick={handleSavePreferences} disabled={isSaving}>
+        <Button onClick={handleSavePreferences} disabled={isSaving || !worldId}>
           {isSaving ? <Spinner size="sm" /> : <Sparkles className="w-4 h-4 mr-1.5" />}
           Save World Preferences
         </Button>

@@ -22,11 +22,15 @@ export default function ArchivePage() {
   const [filter, setFilter] = useState<FilterType>('all');
   const [processingId, setProcessingId] = useState<string | null>(null);
 
-  const worldId =
-    identity?.worldId ||
-    (identity?.displayName ? `world-${identity.displayName.toLowerCase()}` : 'default-world');
+  const worldId = identity?.worldId ?? null;
 
   const loadArchive = useCallback(async () => {
+    if (!worldId) {
+      setItems([]);
+      setIsLoading(false);
+      return;
+    }
+
     setIsLoading(true);
     try {
       const data = await archiveRepo.listArchive(worldId);
@@ -66,7 +70,7 @@ export default function ArchivePage() {
     try {
       await archiveRepo.restoreItem(item.id, item.entity_type, item.entity_id);
       setItems((prev) => prev.filter((i) => i.id !== item.id));
-      showToast(`Restored ${item.entity_type} back to Her World.`, 'success');
+      showToast(`Restored ${item.entity_type} to your private archive.`, 'success');
     } catch {
       showToast(`Couldn't restore this ${item.entity_type}.`, 'error');
     } finally {
@@ -134,7 +138,7 @@ export default function ArchivePage() {
           <EmptyState
             icon={<Sparkles className="w-6 h-6" />}
             title="The archive is quiet"
-            description="Nothing has been archived. Every moment, track, and memory is alive and present in her world."
+            description="Nothing has been archived. Your moments, tracks, and media will appear here when archived."
           />
         ) : (
           <EmptyState
