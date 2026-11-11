@@ -5,7 +5,7 @@
 
 export function getAmbientGreeting(name?: string): { title: string; subtitle: string } {
   const hour = new Date().getHours();
-  const displayName = name?.trim() || 'there';
+  const displayName = name || 'Peshie';
 
   if (hour >= 5 && hour < 12) {
     return {
