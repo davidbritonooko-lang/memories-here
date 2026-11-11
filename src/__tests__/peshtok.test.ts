@@ -26,6 +26,11 @@ describe('Phase 14-16: PeshTok Acceptance Tests', () => {
       expect(messages).not.toMatch(/pretty girl|queen of my|my entire universe|fixes my entire day|forever|breathtaking|love/i);
     });
 
+    it('keeps generated sample comments free of relationship-specific framing', () => {
+      const messages = SIMULATED_COMMENT_POOL.flatMap((profile) => profile.messages).join(' ');
+      expect(messages).not.toMatch(/pretty girl|queen of my|my entire universe|fixes my entire day|forever|breathtaking|love/i);
+    });
+
     it('generateRandomSimulatedComment generates valid simulated comment payload', () => {
       const comment = generateRandomSimulatedComment();
       expect(comment.is_simulated).toBe(true);
