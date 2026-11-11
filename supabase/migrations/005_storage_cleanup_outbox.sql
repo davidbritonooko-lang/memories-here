@@ -63,6 +63,13 @@ BEGIN
       IF NOT FOUND THEN
         RAISE EXCEPTION 'Archived photo was not found';
       END IF;
+      IF v_storage_path !~ ('^' || v_world_id::text || '/photos/') THEN
+        RAISE EXCEPTION 'Photo storage path is outside the owning world';
+      END IF;
+      IF v_thumbnail_path IS NOT NULL
+        AND v_thumbnail_path !~ ('^' || v_world_id::text || '/thumbnails/') THEN
+        RAISE EXCEPTION 'Photo thumbnail path is outside the owning world';
+      END IF;
 
       INSERT INTO public.storage_cleanup_jobs (world_id, bucket_id, object_path)
       VALUES (v_world_id, 'photos', v_storage_path)
@@ -87,6 +94,13 @@ BEGIN
       IF NOT FOUND THEN
         RAISE EXCEPTION 'Archived video was not found';
       END IF;
+      IF v_storage_path !~ ('^' || v_world_id::text || '/videos/') THEN
+        RAISE EXCEPTION 'Video storage path is outside the owning world';
+      END IF;
+      IF v_thumbnail_path IS NOT NULL
+        AND v_thumbnail_path !~ ('^' || v_world_id::text || '/thumbnails/') THEN
+        RAISE EXCEPTION 'Video thumbnail path is outside the owning world';
+      END IF;
 
       INSERT INTO public.storage_cleanup_jobs (world_id, bucket_id, object_path)
       VALUES (v_world_id, 'videos', v_storage_path)
@@ -109,6 +123,9 @@ BEGIN
 
       IF NOT FOUND THEN
         RAISE EXCEPTION 'Archived track was not found';
+      END IF;
+      IF v_storage_path !~ ('^' || v_world_id::text || '/audio/') THEN
+        RAISE EXCEPTION 'Track storage path is outside the owning world';
       END IF;
 
       INSERT INTO public.storage_cleanup_jobs (world_id, bucket_id, object_path)

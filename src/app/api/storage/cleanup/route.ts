@@ -46,6 +46,9 @@ export async function POST(request: Request) {
 
     let removed = 0;
     for (const job of data ?? []) {
+      const expectedPrefix = `${world.id}/${job.bucket_id}/`;
+      if (!job.object_path.startsWith(expectedPrefix)) continue;
+
       const { error: storageError } = await admin.storage
         .from(job.bucket_id)
         .remove([job.object_path]);
