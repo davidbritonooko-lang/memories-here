@@ -8,10 +8,12 @@ import React, {
   useCallback,
   useMemo,
 } from 'react';
+import { getOfflineEngine } from '@/engines/offline/engine';
 import {
   WorldIdentity,
   setStoredWorldIdentity,
   getStoredAccessIdentity,
+  getStoredWorldIdentity,
   setStoredAccessIdentity,
   clearStoredWorldIdentity,
   generateAccessIdentity,
@@ -34,6 +36,13 @@ const WorldIdentityContext = createContext<WorldIdentityContextType | undefined>
 
 interface IdentityResponse {
   identity: WorldIdentity;
+}
+
+function clearOfflineCacheIfWorldChanged(nextWorldId: string): void {
+  const previousWorldId = getStoredWorldIdentity()?.worldId;
+  if (previousWorldId && previousWorldId !== nextWorldId) {
+    void getOfflineEngine().clearCache();
+  }
 }
 
 async function readIdentityResponse(response: Response): Promise<WorldIdentity> {
@@ -69,6 +78,7 @@ export function WorldIdentityProvider({
 
       if (response.status === 401) return false;
       const restored = await readIdentityResponse(response);
+      clearOfflineCacheIfWorldChanged(restored.worldId);
       setStoredAccessIdentity(cleanToken);
       setStoredWorldIdentity(restored);
       setIdentity(restored);
@@ -101,6 +111,7 @@ export function WorldIdentityProvider({
         if (response.ok) {
           const restored = await readIdentityResponse(response);
           if (!cancelled) {
+            clearOfflineCacheIfWorldChanged(restored.worldId);
             setIdentity(restored);
             setStoredWorldIdentity(restored);
             setIdentityError(null);
@@ -113,6 +124,7 @@ export function WorldIdentityProvider({
 
         const storedToken = getStoredAccessIdentity();
         if (storedToken && (await restoreWorldWithToken(storedToken))) return;
+        await getOfflineEngine().clearCache();
         clearStoredWorldIdentity();
       } catch (error) {
         if (!cancelled) {
@@ -152,6 +164,7 @@ export function WorldIdentityProvider({
       });
       const newIdentity = await readIdentityResponse(response);
 
+      clearOfflineCacheIfWorldChanged(newIdentity.worldId);
       setStoredAccessIdentity(accessIdentity);
       setStoredWorldIdentity(newIdentity);
       setIdentity(newIdentity);
@@ -171,6 +184,7 @@ export function WorldIdentityProvider({
     if (!response.ok) {
       throw new Error('Your private-world session could not be closed.');
     }
+    await getOfflineEngine().clearCache();
     clearStoredWorldIdentity();
     setIdentity(null);
   }, []);
