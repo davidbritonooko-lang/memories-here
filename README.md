@@ -41,10 +41,10 @@ acceptance criteria before building the feature.
 
 5. Open <http://localhost:3000>.
 
-The existing project must have all four migrations applied. In particular,
+The existing project must have all five migrations applied. In particular,
 `003_private_world_auth.sql` hashes existing world access keys, removes the raw
 key column, and replaces the earlier open policies. Do not deploy the app with
-only migrations 001–003 applied.
+only migrations 001–004 applied.
 
 ## Environment
 
@@ -58,6 +58,7 @@ environment:
 | `SUPABASE_SERVICE_ROLE_KEY` | Server-only key used to create/restore a world |
 | `SUPABASE_JWT_SECRET` | Server-only Supabase JWT signing secret used for short-lived world-scoped sessions |
 | `SUPABASE_URL` | Optional server-side project URL; falls back to `NEXT_PUBLIC_SUPABASE_URL` |
+| `CRON_SECRET` | Required to authenticate the scheduled Vercel Storage cleanup job |
 
 Never prefix `SUPABASE_SERVICE_ROLE_KEY` or `SUPABASE_JWT_SECRET` with
 `NEXT_PUBLIC_`, commit them, or send them to the browser. The service-role key
@@ -101,8 +102,8 @@ project. Do not use production credentials to run tests.
   fails. Upload success now requires a valid signed URL.
 - Replaced race-prone client track numbering with an atomic database function
   and stopped querying track numbers before validating uploads.
-- Added world-scoped, transactional archive restore and database-record purge operations in migration 004. Permanent deletion of media objects from private Storage remains outstanding.
+- Added world-scoped transactional archive restore and purge operations. Purges enqueue private Storage objects for deletion; the authenticated cleanup endpoint processes them on archive visits, and a daily Vercel Cron retries pending jobs.
 - Removed silent empty-library fallbacks so soundtrack load failures are
   reported to the user.
 - Added server configuration and setup guidance, clarified the phase roadmap,
-  and expanded tests for authenticated access and sequential playback.
+  and expanded tests for authenticated access, sequential playback, archive transactions, and cache isolation.
