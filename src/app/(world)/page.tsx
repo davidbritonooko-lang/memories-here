@@ -15,6 +15,7 @@ import type { Track } from '@/types';
 import type { MomentWithMedia } from '@/features/moments/utils';
 import { getHeroThumbnail, formatMomentDate } from '@/features/moments/utils';
 import { formatTrackTitle } from '@/features/soundtrack/utils';
+import { APP_NAME } from '@/types/constants';
 
 export default function HomePage() {
   const { identity } = useWorldIdentity();
@@ -226,7 +227,7 @@ export default function HomePage() {
       {/* Primary Portals Navigation Grid */}
       <div className="flex flex-col gap-3">
         <span className="text-xs font-semibold uppercase tracking-wider text-muted-text">
-          Explore Peshie
+          Explore {APP_NAME}
         </span>
 
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">

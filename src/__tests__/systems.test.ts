@@ -86,7 +86,7 @@ describe('Phase 17 to 21 Acceptance Tests', () => {
         expect(cacheApi.delete).toHaveBeenCalledWith('peshie-media-v1');
         expect(cacheApi.delete).not.toHaveBeenCalledWith('other-app-cache');
       } finally {
-        delete (window as Window & { caches?: CacheStorage }).caches;
+        Reflect.deleteProperty(window, 'caches');
         vi.unstubAllGlobals();
       }
     });

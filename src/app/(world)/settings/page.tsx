@@ -261,7 +261,7 @@ export default function SettingsPage() {
               </div>
               <div>
                 <h2 className="text-base font-semibold text-primary-text">App Experience</h2>
-                <p className="text-xs text-secondary-text">Install Peshie on your device.</p>
+                <p className="text-xs text-secondary-text">Install {APP_NAME} on your device.</p>
               </div>
             </div>
 
