@@ -554,6 +554,30 @@ export interface Database {
         };
         Relationships: [];
       };
+      storage_cleanup_jobs: {
+        Row: {
+          id: string;
+          world_id: string;
+          bucket_id: 'photos' | 'videos' | 'audio' | 'thumbnails';
+          object_path: string;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          world_id: string;
+          bucket_id: 'photos' | 'videos' | 'audio' | 'thumbnails';
+          object_path: string;
+          created_at?: string;
+        };
+        Update: {
+          id?: string;
+          world_id?: string;
+          bucket_id?: 'photos' | 'videos' | 'audio' | 'thumbnails';
+          object_path?: string;
+          created_at?: string;
+        };
+        Relationships: [];
+      };
       offline_assets: {
         Row: {
           id: string;
