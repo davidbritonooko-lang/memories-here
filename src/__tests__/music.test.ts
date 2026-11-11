@@ -100,6 +100,42 @@ describe('Phase 8: Music Engine Acceptance Tests', () => {
       expect(state.previousContext).toBeNull();
     });
 
+    it('reloads the saved track and restores its position when returning to a previous context', async () => {
+      const audio = {
+        currentTime: 0,
+        duration: 180,
+        volume: 1,
+        preload: '',
+        src: '',
+        load: vi.fn(),
+        play: vi.fn().mockResolvedValue(undefined),
+        pause: vi.fn(),
+        ontimeupdate: null,
+        ondurationchange: null,
+        onended: null,
+        onerror: null,
+      } as unknown as HTMLAudioElement;
+      vi.stubGlobal('Audio', vi.fn(() => audio));
+
+      const resolveTrackUrl = vi.fn(async (track: Track) => `https://audio.example/${track.id}`);
+      const contextEngine = new MusicEngine(resolveTrackUrl);
+
+      await contextEngine.load(mockTrack1, 'https://audio.example/track-1', false);
+      await contextEngine.play();
+      contextEngine.seek(32);
+      contextEngine.requestContext('moment:mom-restore');
+      await contextEngine.load(mockTrack2, 'https://audio.example/track-2', false);
+
+      await contextEngine.releaseContext('moment:mom-restore', true);
+
+      expect(resolveTrackUrl).toHaveBeenCalledWith(mockTrack1);
+      expect(audio.src).toBe('https://audio.example/track-1');
+      expect(audio.currentTime).toBe(32);
+      expect(audio.play).toHaveBeenCalledTimes(2);
+      expect(contextEngine.getState().currentTrack?.id).toBe(mockTrack1.id);
+      expect(contextEngine.getState().playbackState).toBe('playing');
+    });
+
     it('does not allow arbitrary context release from non-owners', async () => {
       engine.requestContext('moment:mom-1');
       await engine.releaseContext('peshtok:feed'); // Wrong owner

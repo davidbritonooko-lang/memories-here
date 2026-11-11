@@ -358,11 +358,39 @@ export class MusicEngine implements IMusicEngine {
     this.state.currentOwner = prev.owner;
     this.state.previousContext = null;
 
-    if (prev.track && prev.playbackState === 'playing') {
-      this.state.currentTrack = prev.track;
+    if (!prev.track) {
+      this.currentAudioUrl = null;
+      this.state.currentTrack = null;
+      this.state.position = 0;
+      this.state.playbackState = prev.playbackState;
+      this.setVolume(prev.volume);
+      this.emit();
+      return;
+    }
+
+    try {
+      // The active audio element may now point at the context being exited.
+      // Resolve and load the saved track before restoring its playback position.
+      const audioUrl = await this.resolveTrackUrl(prev.track);
+      await this.load(prev.track, audioUrl, false);
+      this.setVolume(prev.volume);
       this.seek(prev.position);
-      await this.fadeIn(1.0);
-    } else {
+
+      if (prev.playbackState === 'playing') {
+        await this.fadeIn(1.0);
+      } else {
+        this.state.playbackState = prev.playbackState;
+        this.emit();
+      }
+    } catch (error) {
+      this.audioElement?.pause();
+      this.state.currentTrack = prev.track;
+      this.state.position = prev.position;
+      this.state.playbackState = 'error';
+      this.state.errorMessage =
+        error instanceof Error
+          ? error.message
+          : 'The previous soundtrack could not be restored.';
       this.emit();
     }
   }
