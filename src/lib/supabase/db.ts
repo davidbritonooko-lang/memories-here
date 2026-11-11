@@ -6,6 +6,10 @@ type Tables = Database['public']['Tables'];
 
 type ArchiveEntityType = Tables['archive_items']['Insert']['entity_type'];
 
+function isArchiveEntityType(value: string): value is ArchiveEntityType {
+  return value === 'moment' || value === 'photo' || value === 'video' || value === 'track';
+}
+
 async function setArchivedState(
   entityType: ArchiveEntityType,
   entityId: string,
@@ -475,54 +479,48 @@ export const archiveRepo = {
     return data;
   },
 
-  async restoreItem(archiveItemId: string, entityType: string, entityId: string) {
-    const supabase = getSupabaseBrowserClient();
-    const now = new Date().toISOString();
-
-    // 1. Un-archive the target entity record
-    if (entityType === 'moment') {
-      await supabase.from('moments').update({ archived_at: null, updated_at: now }).eq('id', entityId);
-    } else if (entityType === 'track') {
-      await supabase.from('tracks').update({ archived_at: null }).eq('id', entityId);
-    } else if (entityType === 'photo') {
-      await supabase.from('photos').update({ archived_at: null }).eq('id', entityId);
-    } else if (entityType === 'video') {
-      await supabase.from('videos').update({ archived_at: null }).eq('id', entityId);
+  async restoreItem(
+    archiveItemId: string,
+    entityType: string,
+    entityId: string
+  ) {
+    if (!isArchiveEntityType(entityType)) {
+      throw new Error('Unsupported archive entity type.');
     }
 
-    // 2. Mark restored in audit table
-    const { data, error } = await supabase
-      .from('archive_items')
-      .update({ restored_at: now })
-      .eq('id', archiveItemId)
-      .select()
-      .single();
+    const { data, error } = await getSupabaseBrowserClient().rpc(
+      'restore_archived_world_entity',
+      {
+        p_archive_item_id: archiveItemId,
+        p_entity_id: entityId,
+        p_entity_type: entityType,
+      }
+    );
 
     if (error) throw error;
     return data;
   },
 
-  async permanentlyDelete(archiveItemId: string, entityType: string, entityId: string) {
-    const supabase = getSupabaseBrowserClient();
-
-    // 1. Delete entity record
-    if (entityType === 'moment') {
-      await supabase.from('moments').delete().eq('id', entityId);
-    } else if (entityType === 'track') {
-      await supabase.from('tracks').delete().eq('id', entityId);
-    } else if (entityType === 'photo') {
-      await supabase.from('photos').delete().eq('id', entityId);
-    } else if (entityType === 'video') {
-      await supabase.from('videos').delete().eq('id', entityId);
+  async permanentlyDelete(
+    archiveItemId: string,
+    entityType: string,
+    entityId: string
+  ) {
+    if (!isArchiveEntityType(entityType)) {
+      throw new Error('Unsupported archive entity type.');
     }
 
-    // 2. Delete archive item record
-    const { error } = await supabase
-      .from('archive_items')
-      .delete()
-      .eq('id', archiveItemId);
+    const { data, error } = await getSupabaseBrowserClient().rpc(
+      'purge_archived_world_entity',
+      {
+        p_archive_item_id: archiveItemId,
+        p_entity_id: entityId,
+        p_entity_type: entityType,
+      }
+    );
 
     if (error) throw error;
+    return data;
   },
 };
 
