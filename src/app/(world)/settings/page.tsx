@@ -33,7 +33,16 @@ export default function SettingsPage() {
   const { identity } = useWorldIdentity();
   const { theme, setTheme } = useTheme();
   const { engine, state: musicState } = useMusic();
-  const { usedMB, quotaMB, clearCache, refreshEstimate, cacheMediaAsset, isOnline } = useOffline();
+  const {
+    usedMB,
+    quotaMB,
+    clearCache,
+    refreshEstimate,
+    cacheMediaAsset,
+    isMediaCached,
+    getCachedMediaUsage,
+    isOnline,
+  } = useOffline();
   const { isInstalled, isInstallable, promptInstall, platform } = useInstallation();
   const { showToast } = useToast();
 
@@ -131,12 +140,16 @@ export default function SettingsPage() {
       ];
 
       const maxBytes = 1024 * 1024 * 1024;
-      let savedCount = 0;
+      const existingUsage = await getCachedMediaUsage(worldId);
+      let savedCount = existingUsage.files;
       let failedCount = 0;
       let skippedCount = 0;
-      let savedBytes = 0;
+      let savedBytes = existingUsage.bytes;
 
       for (const asset of assets) {
+        const cacheKey = { worldId, bucket: asset.bucket, storagePath: asset.storagePath };
+        if (await isMediaCached(cacheKey)) continue;
+
         if (!asset.sizeBytes || asset.sizeBytes > maxBytes - savedBytes) {
           skippedCount += 1;
           continue;
@@ -167,7 +180,7 @@ export default function SettingsPage() {
       await refreshEstimate();
       const savedMB = (savedBytes / (1024 * 1024)).toFixed(1);
       showToast(
-        `Saved ${savedCount} media files (${savedMB} MB). ${failedCount} failed; ${skippedCount} skipped by the 1 GB limit or missing size metadata.`,
+        `Offline cache now contains ${savedCount} files (${savedMB} MB). ${failedCount} failed; ${skippedCount} skipped by the 1 GB limit or missing size metadata.`,
         failedCount > 0 ? 'info' : 'success'
       );
     } catch {

@@ -123,6 +123,55 @@ export class OfflineEngine {
     return this.getState();
   }
 
+  public async isMediaCached(asset: Pick<OfflineMediaAsset, 'worldId' | 'bucket' | 'storagePath'>): Promise<boolean> {
+    if (
+      typeof window === 'undefined' ||
+      !('caches' in window) ||
+      !isWorldScopedMediaPath(asset.worldId, asset.bucket, asset.storagePath)
+    ) {
+      return false;
+    }
+
+    try {
+      const key = buildOfflineMediaCacheUrl(
+        window.location.origin,
+        asset.worldId,
+        asset.bucket,
+        asset.storagePath
+      );
+      const cache = await caches.open(MEDIA_CACHE_NAME);
+      return Boolean(await cache.match(key));
+    } catch {
+      return false;
+    }
+  }
+
+  public async getCachedMediaUsage(worldId: string): Promise<{ files: number; bytes: number }> {
+    if (typeof window === 'undefined' || !('caches' in window) || !worldId) {
+      return { files: 0, bytes: 0 };
+    }
+
+    try {
+      const cache = await caches.open(MEDIA_CACHE_NAME);
+      const requests = await cache.keys();
+      const worldRequests = requests.filter((request) => {
+        const url = new URL(request.url);
+        return url.pathname === OFFLINE_MEDIA_PATH && url.searchParams.get('world') === worldId;
+      });
+
+      let bytes = 0;
+      for (const request of worldRequests) {
+        const response = await cache.match(request);
+        const size = Number(response?.headers.get('content-length'));
+        if (Number.isFinite(size) && size > 0) bytes += size;
+      }
+
+      return { files: worldRequests.length, bytes };
+    } catch {
+      return { files: 0, bytes: 0 };
+    }
+  }
+
   public async cacheMediaAsset(asset: OfflineMediaAsset): Promise<OfflineCacheResult> {
     if (
       typeof window === 'undefined' ||
@@ -156,8 +205,17 @@ export class OfflineEngine {
         asset.bucket,
         asset.storagePath
       );
+      const headers = new Headers(response.headers);
+      headers.set('content-length', String(actualSize));
       const cache = await caches.open(MEDIA_CACHE_NAME);
-      await cache.put(key, response);
+      await cache.put(
+        key,
+        new Response(response.body, {
+          status: response.status,
+          statusText: response.statusText,
+          headers,
+        })
+      );
       await this.estimateStorage();
 
       return { success: true, bytes: actualSize };
