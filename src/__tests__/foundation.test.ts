@@ -6,9 +6,9 @@ import { cn } from '@/utils/cn';
 describe('Phase 1: Project Foundation Acceptance Tests', () => {
   it('keeps the production product name in one reusable constant', () => {
     expect(APP_NAME).toBe('Peshie');
-    expect(PRODUCT_IDENTITY.name).toBe(`${APP_NAME} — Her World`);
-    expect(PRODUCT_IDENTITY.positioning).toBe('A little corner of the internet that belongs to her.');
-    expect(PRODUCT_IDENTITY.statement).toBe('I noticed these things about your life, and I thought they were worth keeping.');
+    expect(PRODUCT_IDENTITY.name).toBe(APP_NAME);
+    expect(PRODUCT_IDENTITY.positioning).toBe('A private space for moments, media, and memories.');
+    expect(PRODUCT_IDENTITY.statement).toBe('Keep photos, videos, notes, and soundtracks together in one private space.');
   });
 
   it('uses the central product name in the installable web manifest', () => {

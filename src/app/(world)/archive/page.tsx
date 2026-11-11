@@ -22,15 +22,11 @@ export default function ArchivePage() {
   const [filter, setFilter] = useState<FilterType>('all');
   const [processingId, setProcessingId] = useState<string | null>(null);
 
-  const worldId = identity?.worldId ?? null;
+  const worldId =
+    identity?.worldId ||
+    (identity?.displayName ? `world-${identity.displayName.toLowerCase()}` : 'default-world');
 
   const loadArchive = useCallback(async () => {
-    if (!worldId) {
-      setItems([]);
-      setIsLoading(false);
-      return;
-    }
-
     setIsLoading(true);
     try {
       const data = await archiveRepo.listArchive(worldId);

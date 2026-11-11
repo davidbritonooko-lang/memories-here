@@ -1,6 +1,6 @@
-# Peshie — Her World
+# Peshie
 
-A private, personal space for moments, media, and a soundtrack. The app is built
+A private personal archive for moments, media, notes, and soundtracks. The app is built
 with Next.js 16, React, TypeScript, and Supabase.
 
 ## Project status and phases
@@ -16,7 +16,7 @@ control issues found before starting the next feature phase.
 | 4–9 | Identity, database, storage, media, music engine, and soundtrack library | Baseline implemented; identity and authorization hardened in this pass |
 | 10 | Moments list and creation | Initial implementation; detail route remains a stub |
 | **11–12** | **Moment Engine and moment detail experience** | **Next phase; not started** |
-| 13 | Archive | Stub |
+| 13 | Archive | Initial UI and transactional database operations; media-object cleanup still needs implementation |
 | 14–16 | PeshTok | Stub |
 | 20 | Settings | Stub |
 | 21 | Home experience | Stub |
@@ -41,10 +41,10 @@ acceptance criteria before building the feature.
 
 5. Open <http://localhost:3000>.
 
-The existing project must have all three migrations applied. In particular,
+The existing project must have all four migrations applied. In particular,
 `003_private_world_auth.sql` hashes existing world access keys, removes the raw
 key column, and replaces the earlier open policies. Do not deploy the app with
-only migrations 001 and 002 applied.
+only migrations 001–003 applied.
 
 ## Environment
 
@@ -101,8 +101,7 @@ project. Do not use production credentials to run tests.
   fails. Upload success now requires a valid signed URL.
 - Replaced race-prone client track numbering with an atomic database function
   and stopped querying track numbers before validating uploads.
-- Made archive/restore changes and their audit records transactional and
-  world-scoped.
+- Added world-scoped, transactional archive restore and database-record purge operations in migration 004. Permanent deletion of media objects from private Storage remains outstanding.
 - Removed silent empty-library fallbacks so soundtrack load failures are
   reported to the user.
 - Added server configuration and setup guidance, clarified the phase roadmap,

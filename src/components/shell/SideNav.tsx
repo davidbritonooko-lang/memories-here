@@ -49,9 +49,6 @@ export function SideNav() {
           <span className="font-editorial text-2xl font-semibold text-[#171518] dark:text-[#F5F1F4] tracking-tight group-hover:text-[#B96F91] dark:group-hover:text-[#D59AB6] transition-colors">
             {APP_NAME}
           </span>
-          <span className="font-ui text-xs text-[#9A949B] dark:text-[#77717A] tracking-widest uppercase">
-            Her World
-          </span>
         </Link>
       </div>
 

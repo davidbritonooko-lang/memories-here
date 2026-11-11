@@ -37,14 +37,11 @@ export default function SettingsPage() {
   const [isSaving, setIsSaving] = useState(false);
   const [isClearing, setIsClearing] = useState(false);
 
-  const worldId = identity?.worldId ?? null;
+  const worldId =
+    identity?.worldId ||
+    (identity?.displayName ? `world-${identity.displayName.toLowerCase()}` : 'default-world');
 
   const handleSavePreferences = async () => {
-    if (!worldId) {
-      showToast('Your private space is unavailable. Reconnect and try again.', 'error');
-      return;
-    }
-
     setIsSaving(true);
     try {
       await worldRepo.updatePreferences(worldId, {
@@ -123,7 +120,7 @@ export default function SettingsPage() {
                 Display Name
               </span>
               <p className="mt-0.5 text-sm font-medium text-primary-text">
-                {identity?.displayName || 'Not set'}
+                {identity?.displayName || 'Peshie'}
               </p>
             </div>
 
@@ -132,7 +129,7 @@ export default function SettingsPage() {
                 World Identifier
               </span>
               <p className="mt-0.5 text-xs font-mono text-secondary-text truncate">
-                {worldId || 'Unavailable'}
+                {worldId}
               </p>
             </div>
           </div>
@@ -285,7 +282,7 @@ export default function SettingsPage() {
 
       {/* Floating Save Actions */}
       <div className="flex items-center justify-end gap-3 mt-4">
-        <Button onClick={handleSavePreferences} disabled={isSaving || !worldId}>
+        <Button onClick={handleSavePreferences} disabled={isSaving}>
           {isSaving ? <Spinner size="sm" /> : <Sparkles className="w-4 h-4 mr-1.5" />}
           Save World Preferences
         </Button>
