@@ -4,8 +4,8 @@ const { rpcMock } = vi.hoisted(() => ({
   rpcMock: vi.fn(),
 }));
 
-vi.mock('../lib/supabase/client', () => ({
-  getSupabaseBrowserClient: () => ({ rpc: rpcMock }),
+vi.mock('@supabase/supabase-js', () => ({
+  createClient: () => ({ rpc: rpcMock }),
 }));
 
 import { archiveRepo } from '@/lib/supabase/db';
