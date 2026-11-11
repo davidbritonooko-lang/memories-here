@@ -54,7 +54,8 @@ BEGIN
       WHERE id = p_entity_id AND world_id = v_world_id AND archived_at IS NOT NULL
       RETURNING id INTO v_deleted_id;
     WHEN 'photo' THEN
-      SELECT storage_path INTO v_storage_path
+      SELECT storage_path, thumbnail_path
+      INTO v_storage_path, v_thumbnail_path
       FROM public.photos
       WHERE id = p_entity_id AND world_id = v_world_id AND archived_at IS NOT NULL
       FOR UPDATE;
@@ -66,6 +67,12 @@ BEGIN
       INSERT INTO public.storage_cleanup_jobs (world_id, bucket_id, object_path)
       VALUES (v_world_id, 'photos', v_storage_path)
       ON CONFLICT (world_id, bucket_id, object_path) DO NOTHING;
+
+      IF v_thumbnail_path IS NOT NULL AND length(btrim(v_thumbnail_path)) > 0 THEN
+        INSERT INTO public.storage_cleanup_jobs (world_id, bucket_id, object_path)
+        VALUES (v_world_id, 'thumbnails', v_thumbnail_path)
+        ON CONFLICT (world_id, bucket_id, object_path) DO NOTHING;
+      END IF;
 
       DELETE FROM public.photos
       WHERE id = p_entity_id AND world_id = v_world_id AND archived_at IS NOT NULL

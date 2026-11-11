@@ -48,6 +48,14 @@ export default function ArchivePage() {
     })();
   }, [loadArchive]);
 
+  useEffect(() => {
+    if (!worldId) return;
+    void fetch('/api/storage/cleanup', {
+      method: 'POST',
+      credentials: 'same-origin',
+    }).catch(() => undefined);
+  }, [worldId]);
+
   // Filtered items
   const filteredItems = useMemo(() => {
     if (filter === 'all') return items;
@@ -86,8 +94,28 @@ export default function ArchivePage() {
     setProcessingId(item.id);
     try {
       await archiveRepo.permanentlyDelete(item.id, item.entity_type, item.entity_id);
+
+      let cleanupPending = true;
+      try {
+        const response = await fetch('/api/storage/cleanup', {
+          method: 'POST',
+          credentials: 'same-origin',
+        });
+        if (response.ok) {
+          const result = (await response.json()) as { pending?: number };
+          cleanupPending = typeof result.pending !== 'number' || result.pending > 0;
+        }
+      } catch {
+        cleanupPending = true;
+      }
+
       setItems((prev) => prev.filter((i) => i.id !== item.id));
-      showToast(`Permanently deleted ${item.entity_type}.`, 'info');
+      showToast(
+        cleanupPending
+          ? 'Record removed. Media cleanup is queued and will retry on your next visit.'
+          : `Permanently deleted ${item.entity_type} and its stored media.`,
+        cleanupPending ? 'error' : 'info'
+      );
     } catch {
       showToast(`Couldn't delete this ${item.entity_type}.`, 'error');
     } finally {
