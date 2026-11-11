@@ -1,12 +1,20 @@
 import { describe, it, expect } from 'vitest';
-import { PRODUCT_IDENTITY, APPROVED_NAVIGATION } from '@/types/constants';
+import { APP_NAME, PRODUCT_IDENTITY, APPROVED_NAVIGATION } from '@/types/constants';
+import manifest from '@/app/manifest';
 import { cn } from '@/utils/cn';
 
 describe('Phase 1: Project Foundation Acceptance Tests', () => {
-  it('correctly defines the core product identity according to spec section 1', () => {
-    expect(PRODUCT_IDENTITY.name).toBe('Peshie — Her World');
+  it('keeps the production product name in one reusable constant', () => {
+    expect(APP_NAME).toBe('Peshie');
+    expect(PRODUCT_IDENTITY.name).toBe(`${APP_NAME} — Her World`);
     expect(PRODUCT_IDENTITY.positioning).toBe('A little corner of the internet that belongs to her.');
     expect(PRODUCT_IDENTITY.statement).toBe('I noticed these things about your life, and I thought they were worth keeping.');
+  });
+
+  it('uses the central product name in the installable web manifest', () => {
+    const appManifest = manifest();
+    expect(appManifest.name).toBe(PRODUCT_IDENTITY.name);
+    expect(appManifest.short_name).toBe(APP_NAME);
   });
 
   it('verifies the approved product information architecture according to spec section 3', () => {

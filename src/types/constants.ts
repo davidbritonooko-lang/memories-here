@@ -1,11 +1,13 @@
 /**
- * Peshie — Her World
- * Foundational Product Constants & Approved Structure
- * Specification Sections: 1, 3, 7, 8
+ * Product identity and approved structure.
+ * Keep the production-facing product name in APP_NAME so a future rebrand
+ * can update one source of truth.
  */
 
+export const APP_NAME = 'Peshie' as const;
+
 export const PRODUCT_IDENTITY = {
-  name: 'Peshie — Her World',
+  name: `${APP_NAME} — Her World`,
   category: 'Private personal memory world / installable progressive web application',
   positioning: 'A little corner of the internet that belongs to her.',
   statement: 'I noticed these things about your life, and I thought they were worth keeping.',
