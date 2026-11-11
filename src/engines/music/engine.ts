@@ -359,6 +359,11 @@ export class MusicEngine implements IMusicEngine {
     this.state.previousContext = null;
 
     if (!prev.track) {
+      if (this.audioElement) {
+        this.audioElement.pause();
+        this.audioElement.removeAttribute('src');
+        this.audioElement.load();
+      }
       this.currentAudioUrl = null;
       this.state.currentTrack = null;
       this.state.position = 0;

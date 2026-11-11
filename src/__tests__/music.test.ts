@@ -110,6 +110,7 @@ describe('Phase 8: Music Engine Acceptance Tests', () => {
         load: vi.fn(),
         play: vi.fn().mockResolvedValue(undefined),
         pause: vi.fn(),
+        removeAttribute: vi.fn(),
         ontimeupdate: null,
         ondurationchange: null,
         onended: null,
@@ -134,6 +135,36 @@ describe('Phase 8: Music Engine Acceptance Tests', () => {
       expect(audio.play).toHaveBeenCalledTimes(2);
       expect(contextEngine.getState().currentTrack?.id).toBe(mockTrack1.id);
       expect(contextEngine.getState().playbackState).toBe('playing');
+    });
+
+    it('stops context audio when the previous context had no track', async () => {
+      const audio = {
+        currentTime: 0,
+        duration: 180,
+        volume: 1,
+        preload: '',
+        src: '',
+        load: vi.fn(),
+        play: vi.fn().mockResolvedValue(undefined),
+        pause: vi.fn(),
+        removeAttribute: vi.fn(),
+        ontimeupdate: null,
+        ondurationchange: null,
+        onended: null,
+        onerror: null,
+      } as unknown as HTMLAudioElement;
+      vi.stubGlobal('Audio', vi.fn(() => audio));
+
+      const contextEngine = new MusicEngine(async (track) => `https://audio.example/${track.id}`);
+      contextEngine.requestContext('moment:mom-empty');
+      await contextEngine.load(mockTrack2, 'https://audio.example/track-2', false);
+
+      await contextEngine.releaseContext('moment:mom-empty', true);
+
+      expect(audio.pause).toHaveBeenCalled();
+      expect(audio.removeAttribute).toHaveBeenCalledWith('src');
+      expect(contextEngine.getState().currentTrack).toBeNull();
+      expect(contextEngine.getState().playbackState).toBe('idle');
     });
 
     it('does not allow arbitrary context release from non-owners', async () => {
