@@ -1,0 +1,70 @@
+name: Refresh dependency lock
+
+on:
+  push:
+    branches:
+      - "engineering/production-readiness"
+
+permissions:
+  contents: write
+
+concurrency:
+  group: dependency-refresh-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  refresh:
+    name: Refresh and verify dependency lock
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    env:
+      NEXT_TELEMETRY_DISABLED: "1"
+      NEXT_PUBLIC_SUPABASE_URL: https://example.supabase.co
+      NEXT_PUBLIC_SUPABASE_ANON_KEY: ci-placeholder-anon-key
+      SUPABASE_URL: https://example.supabase.co
+      SUPABASE_SERVICE_ROLE_KEY: ci-placeholder-service-role-key
+      SUPABASE_JWT_SECRET: ci-placeholder-jwt-secret
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v5
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v5
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Regenerate the lockfile
+        run: |
+          npm install --package-lock-only --ignore-scripts
+          npm audit fix --ignore-scripts
+
+      - name: Install locked dependencies
+        run: npm ci
+
+      - name: Audit production dependencies
+        run: npm audit --omit=dev --audit-level=high
+
+      - name: Type check
+        run: npm run type-check
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Run tests
+        run: npm test
+
+      - name: Build production application
+        run: npm run build
+
+      - name: Commit verified lockfile updates
+        run: |
+          if git diff --quiet -- package.json package-lock.json; then
+            echo "Dependency files are already current."
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add package.json package-lock.json
+          git commit -m "chore: refresh vulnerable dependency resolutions"
+          git push origin "HEAD:${GITHUB_REF_NAME}"
